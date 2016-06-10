@@ -1,14 +1,29 @@
 import numpy as np
 import heapq
 import pandas as pd
-from scipy.sparse import csr_matrix
 
-def dijkstra(G, i):
+def load_matod(filename):
+    # read matod
+    table = pd.read_csv(filename, sep=' ')
+    matod = {}
+    for index, row in table.iterrows():
+        if (not matod.has_key(row.o)):
+            matod[row.o] = {}
+        if (not matod[row.o].has_key(row.o)):
+            matod[row.o][row.d] = row.vol
+        else:
+            matod[row.o][row.d] += row.vol
+    return matod
+
+
+def dijkstra(G, i, verbose=False):
     assert isinstance(G, dict)
-    d = {}; p = {}; v = {}
+    d = {}
+    p = {}
+    v = {}
     for j in G.keys():
-        d[j] = np.inf # d[i] = distance to node i
-        p[j] = 0      # p[i] = predecessor of node i
+        d[j] = np.inf  # d[i] = distance to node i
+        p[j] = 0  # p[i] = predecessor of node i
         v[j] = False  # v[i] is True if node is already visited False otherwise
 
     # init
@@ -18,35 +33,41 @@ def dijkstra(G, i):
     p[i] = i
     while len(h) > 0:
         (dij, j) = heapq.heappop(h)
-        print 'j = %2d, dij = %4.2lf' % (j, dij)
-        if v[j] : continue
+        if verbose: print 'j = %2d, dij = %4.2lf' % (j, dij)
+        if v[j]: continue
         for k in G[j]:
             dijk = dij + G[j][k]
             if dijk < d[k]:
-                print '   k = %2d, dijk = %4.2lf' % (k, dijk)
+                if verbose: print '   k = %2d, dijk = %4.2lf' % (k, dijk)
                 d[k] = dijk
                 p[k] = j
                 heapq.heappush(h, (dijk, k))
         v[j] = True
     return d, p
 
+
 def dijkstra_path(i, j, p):
-    print(p)
     s = [j]
-    while(p[j] is not i):
-        s.append(p[j])
+    while True:
         j = p[j]
-    s.append(i)
+        s.append(j)
+        # origin (i) has been found
+        if j == i: break
+    s.reverse()
+    print(s)
     return s
 
 
-def ita(edges, matod, cost, fracs=[.7,.1,.1,.1]):
-    print('ITA')
+def ita(edges, matod, cost, fracs=None):
+    if fracs is None:
+        fracs = [.7, .1, .1, .1]
+
+    print 'ITA'
     assert isinstance(edges, pd.DataFrame)
-    print('   Creating dictionaries')
-    T = {} # time
-    K = {} # capacity
-    V = {} # volumes
+    print '   Creating data structures'
+    T = {}  # time
+    K = {}  # capacity
+    V = {}  # volumes
     for index, row in edges.iterrows():
         i = int(row.o)
         j = int(row.d)
@@ -58,39 +79,81 @@ def ita(edges, matod, cost, fracs=[.7,.1,.1,.1]):
             T[i][j] = row.ftt
             K[i][j] = row.capacity
             V[i][j] = 0
-
     C = T.copy() # init costs (free travel time)
 
-    fracs = np.array(fracs)
-
+    print '   Finding shortest paths'
+    assert isinstance(matod, dict)
     for f in fracs:
-        for index, row in matod.iterrows():
-            print 'o: %d, d:%d' % (row.o, row.d)
-            vol = row.vol * f
+        for i in matod.keys():
+            # find shortest path from i to all nodes
+            c, p = dijkstra(C, i) # cost and predecessors
 
-            # find shortest path
-            c, p = dijkstra(C, row.o) # cost and predecessors
-            raise Exception('NotImplemented')
-            print dijkstra_path(row.o, row.d, p)
-            # update volumes and costs
-            j = row.d
-            while p[j] is not row.o:
-                i = p[j]
-                print 'Updating edge (%2d,%2d)' % (i, j)
-                V[i][j] += vol
+            # update volumes
+            for j in matod[i].keys():
+                ej = j # edge end node
+                while True:
+                    ei = p[ej] # edge begin node
+                    # update volume
+                    V[ei][ej] += matod[i][j] * f
+                    # path origin has been found
+                    if ei == i: break
+                    ej = ei
+
+        # update costs
+        for i in V.keys():
+            for j in V[i].keys():
                 C[i][j] = cost(V[i][j], T[i][j], K[i][j])
-                j = p[j]
 
+    traffic_assignment_quality(matod, V, C)
+    return V, C
+
+
+def traffic_assignment_quality(matod, V, C):
+    assert isinstance(matod, dict)
+    assert isinstance(C, dict)
+
+    total_path_cost = 0
+    for i in matod.keys():
+        # cost and predecessors
+        c, p = dijkstra(C, i)
+        # update total path cost
+        for j in matod[i].keys():
+            ej = j
+            while True:
+                ei = p[ej]
+                total_path_cost += C[ei][ej]
+                # path origin has been found
+                if ei == i: break
+                ej = ei
+
+    total_edge_cost = 0
+    for i in C.keys():
+        for j in C[i].keys():
+            total_edge_cost += C[i][j] * V[i][j]
+
+    print 'Traffic assignment relative error is %3.2f%%.' % (100.0 * (total_edge_cost - total_path_cost) / total_path_cost)
 
 def __test_dial():
-    # load instance defined in Dial2006
+    # load instance
     edges = pd.read_csv('../instances/dial_edges.txt', sep=' ')
-    matod = pd.read_csv('../instances/dial_od.txt', sep=' ')
-
+    # load matod
+    matod = load_matod('../instances/dial_od.txt')
     # cost function from Dial2006
-    cost = lambda xij, tij, kij: tij * (1 + 0.15 * (xij/kij)**4)
-
+    cost = lambda xij, tij, kij: tij * (1 + 0.15 * (xij / kij) ** 4)
     ita(edges, matod, cost)
+
+def __test_smallA():
+    # load instance
+    edges = pd.read_csv('../instances/smallA_edges.txt', sep=' ')
+    # load matod
+    matod = load_matod('../instances/smallA_od.txt')
+    # cost function
+    cost = lambda xij, tij, kij: tij + (xij / kij)
+    V, C = ita(edges, matod, cost)
+    print edges
+    print 'matod = ', matod
+    print 'V = ', V
+    print 'C = ', C
 
 def __test_dijkstra():
     G = {0: {1: 2, 3: 1},
@@ -104,5 +167,6 @@ def __test_dijkstra():
     print d, p
 
 
-if __name__== '__main__':
-    __test_dial()
+if __name__ == '__main__':
+    # __test_dial()
+    __test_smallA()
