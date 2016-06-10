@@ -60,7 +60,7 @@ def dijkstra_path(i, j, p):
 
 def ita(edges, matod, cost, fracs=None):
     if fracs is None:
-        fracs = [.7, .1, .1, .1]
+        fracs = np.linspace(0, 1)
 
     print 'ITA'
     assert isinstance(edges, pd.DataFrame)
@@ -121,7 +121,7 @@ def traffic_assignment_quality(matod, V, C):
             ej = j
             while True:
                 ei = p[ej]
-                total_path_cost += C[ei][ej]
+                total_path_cost += C[ei][ej] * V[ei][ej]
                 # path origin has been found
                 if ei == i: break
                 ej = ei
@@ -131,9 +131,12 @@ def traffic_assignment_quality(matod, V, C):
         for j in C[i].keys():
             total_edge_cost += C[i][j] * V[i][j]
 
-    print 'Traffic assignment relative error is %3.2f%%.' % (100.0 * (total_edge_cost - total_path_cost) / total_path_cost)
-
-def __test_dial():
+    print ''
+    print 'Traffic assignment quality'
+    print '   Total edge cost %g' % total_edge_cost
+    print '   Total path cost %g' % total_path_cost
+    print '   Accuracy        %g' % (total_path_cost/total_edge_cost)
+def __test_dial__():
     # load instance
     edges = pd.read_csv('../instances/dial_edges.txt', sep=' ')
     # load matod
@@ -142,7 +145,14 @@ def __test_dial():
     cost = lambda xij, tij, kij: tij * (1 + 0.15 * (xij / kij) ** 4)
     ita(edges, matod, cost)
 
-def __test_smallA():
+def print_dict(V, label):
+    print label
+    assert isinstance(V, dict)
+    for i in V.keys():
+        for j in V[i].keys():
+            print '   i = %2d, j = %2d value = %g' % (i, j, V[i][j])
+
+def __test_smallA__():
     # load instance
     edges = pd.read_csv('../instances/smallA_edges.txt', sep=' ')
     # load matod
@@ -150,12 +160,12 @@ def __test_smallA():
     # cost function
     cost = lambda xij, tij, kij: tij + (xij / kij)
     V, C = ita(edges, matod, cost)
-    print edges
-    print 'matod = ', matod
-    print 'V = ', V
-    print 'C = ', C
+    # print edges
+    # print 'matod = ', matod
+    print_dict(V, 'Edges volume -------------')
+    print_dict(C, 'Edges cost ---------------')
 
-def __test_dijkstra():
+def __test_dijkstra__():
     G = {0: {1: 2, 3: 1},
          1: {0: 2, 2: 1, 3: 1, 4: 2},
          2: {1: 1, 4: 2, 5: 5},
@@ -168,5 +178,5 @@ def __test_dijkstra():
 
 
 if __name__ == '__main__':
-    # __test_dial()
-    __test_smallA()
+    # __test_dial__()
+    __test_smallA__()
