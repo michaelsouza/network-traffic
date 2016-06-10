@@ -1,6 +1,7 @@
 import numpy as np
 import heapq
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def load_matod(filename):
     # read matod
@@ -46,28 +47,34 @@ def dijkstra(G, i, verbose=False):
     return d, p
 
 
-def dijkstra_path(i, j, p):
+def print_dijkstra_path(i, j, p):
     s = [j]
     while True:
-        j = p[j]
-        s.append(j)
-        # origin (i) has been found
-        if j == i: break
+        k = p[j]
+        s.append(k)
+        # origin has been found
+        if k == i: break
+        j = k
     s.reverse()
     print(s)
     return s
 
 
-def ita(edges, matod, cost, fracs=None):
+def ita(edges, matod, cost, fracs=None, verbose=False):
     if fracs is None:
-        fracs = np.linspace(0, 1)
+        fracs = np.ones(10)/10
 
-    print 'ITA'
+    if sum(fracs) < 0.99:
+        raise Exception('The input sum(fracs) must be equal to one.')
+
     assert isinstance(edges, pd.DataFrame)
-    print '   Creating data structures'
+
+    if verbose: print 'ITA'
+    if verbose: print '   Creating data structures'
     T = {}  # time
     K = {}  # capacity
     V = {}  # volumes
+    C = {}  # cost
     for index, row in edges.iterrows():
         i = int(row.o)
         j = int(row.d)
@@ -75,21 +82,25 @@ def ita(edges, matod, cost, fracs=None):
             T[i] = {}
             K[i] = {}
             V[i] = {}
+            C[i] = {}
         if j not in T[i]:
             T[i][j] = row.ftt
             K[i][j] = row.capacity
             V[i][j] = 0
-    C = T.copy() # init costs (free travel time)
+            C[i][j] = 0
 
-    print '   Finding shortest paths'
     assert isinstance(matod, dict)
+    if verbose: print '   Finding shortest paths'
+    iter = 0
     for f in fracs:
         for i in matod.keys():
+            if verbose: print 'Find paths from node %d' % i
             # find shortest path from i to all nodes
             c, p = dijkstra(C, i) # cost and predecessors
 
             # update volumes
             for j in matod[i].keys():
+                if verbose: print_dijkstra_path(i, j, p)
                 ej = j # edge end node
                 while True:
                     ei = p[ej] # edge begin node
@@ -99,16 +110,21 @@ def ita(edges, matod, cost, fracs=None):
                     if ei == i: break
                     ej = ei
 
-        # update costs
-        for i in V.keys():
-            for j in V[i].keys():
-                C[i][j] = cost(V[i][j], T[i][j], K[i][j])
+            # update costs
+            for i in V.keys():
+                for j in V[i].keys():
+                    C[i][j] = cost(V[i][j], T[i][j], K[i][j])
 
-    traffic_assignment_quality(matod, V, C)
-    return V, C
+        # view V and C
+        if verbose: print_dict(V, 'Vols iter %d' % iter)
+        if verbose: print_dict(C, 'Cost iter %d' % iter)
+        iter += 1
+
+    quality = traffic_assignment_quality(matod, V, C)
+    return V, C, quality
 
 
-def traffic_assignment_quality(matod, V, C):
+def traffic_assignment_quality(matod, V, C, verbose=False):
     assert isinstance(matod, dict)
     assert isinstance(C, dict)
 
@@ -131,11 +147,14 @@ def traffic_assignment_quality(matod, V, C):
         for j in C[i].keys():
             total_edge_cost += C[i][j] * V[i][j]
 
-    print ''
-    print 'Traffic assignment quality'
-    print '   Total edge cost %g' % total_edge_cost
-    print '   Total path cost %g' % total_path_cost
-    print '   Accuracy        %g' % (total_path_cost/total_edge_cost)
+    quality = total_path_cost/total_edge_cost
+    if verbose: print 'Traffic assignment quality'
+    if verbose: print '   Total path cost %g' % total_path_cost
+    if verbose: print '   Total edge cost %g' % total_edge_cost
+    if verbose: print '   Accuracy        %g' % quality
+
+    return quality
+
 def __test_dial__():
     # load instance
     edges = pd.read_csv('../instances/dial_edges.txt', sep=' ')
@@ -145,12 +164,14 @@ def __test_dial__():
     cost = lambda xij, tij, kij: tij * (1 + 0.15 * (xij / kij) ** 4)
     ita(edges, matod, cost)
 
+
 def print_dict(V, label):
     print label
     assert isinstance(V, dict)
     for i in V.keys():
         for j in V[i].keys():
             print '   i = %2d, j = %2d value = %g' % (i, j, V[i][j])
+
 
 def __test_smallA__():
     # load instance
@@ -159,11 +180,22 @@ def __test_smallA__():
     matod = load_matod('../instances/smallA_od.txt')
     # cost function
     cost = lambda xij, tij, kij: tij + (xij / kij)
-    V, C = ita(edges, matod, cost)
+
+    V, C, quality = ita(edges, matod, cost)
     # print edges
     # print 'matod = ', matod
-    print_dict(V, 'Edges volume -------------')
-    print_dict(C, 'Edges cost ---------------')
+    # print_dict(V, 'Edges volume -------------')
+    # print_dict(C, 'Edges cost ---------------')
+    quality = {}
+    for i in range(2,20):
+        V, C, quality[i+1] = ita(edges, matod, cost, fracs=np.ones(i+1)/(i+1), verbose=True)
+
+    plt.close('all')
+    plt.plot(quality.keys(), quality.values())
+    plt.xlabel('Number of packages')
+    plt.ylabel('Accuracy')
+    plt.show()
+
 
 def __test_dijkstra__():
     G = {0: {1: 2, 3: 1},
