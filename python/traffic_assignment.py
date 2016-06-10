@@ -62,12 +62,15 @@ def print_dijkstra_path(i, j, p):
 
 def ita(edges, matod, cost, fracs=None, verbose=False):
     if fracs is None:
-        fracs = np.ones(10)/10
+        fracs = np.ones(100)/100
 
     if sum(fracs) < 0.99:
         raise Exception('The input sum(fracs) must be equal to one.')
 
     assert isinstance(edges, pd.DataFrame)
+
+    # read nodes from edges
+    nodes = []
 
     if verbose: print 'ITA'
     if verbose: print '   Creating data structures'
@@ -83,6 +86,11 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
             K[i] = {}
             V[i] = {}
             C[i] = {}
+        if j not in T.keys():
+            T[j] = {}
+            K[j] = {}
+            V[j] = {}
+            C[j] = {}
         if j not in T[i]:
             T[i][j] = row.ftt
             K[i][j] = row.capacity
@@ -110,10 +118,10 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
                     if ei == i: break
                     ej = ei
 
-            # update costs
-            for i in V.keys():
-                for j in V[i].keys():
-                    C[i][j] = cost(V[i][j], T[i][j], K[i][j])
+        # update costs
+        for i in V.keys():
+            for j in V[i].keys():
+                C[i][j] = cost(V[i][j], T[i][j], K[i][j])
 
         # view V and C
         if verbose: print_dict(V, 'Vols iter %d' % iter)
@@ -134,13 +142,7 @@ def traffic_assignment_quality(matod, V, C, verbose=False):
         c, p = dijkstra(C, i)
         # update total path cost
         for j in matod[i].keys():
-            ej = j
-            while True:
-                ei = p[ej]
-                total_path_cost += C[ei][ej] * V[ei][ej]
-                # path origin has been found
-                if ei == i: break
-                ej = ei
+            total_path_cost += matod[i][j] * c[j]
 
     total_edge_cost = 0
     for i in C.keys():
@@ -173,11 +175,11 @@ def print_dict(V, label):
             print '   i = %2d, j = %2d value = %g' % (i, j, V[i][j])
 
 
-def __test_smallA__():
+def __test_small__():
     # load instance
-    edges = pd.read_csv('../instances/smallA_edges.txt', sep=' ')
+    edges = pd.read_csv('../instances/dial_edges.txt', sep=' ')
     # load matod
-    matod = load_matod('../instances/smallA_od.txt')
+    matod = load_matod('../instances/dial_od.txt')
     # cost function
     cost = lambda xij, tij, kij: tij + (xij / kij)
 
@@ -188,7 +190,7 @@ def __test_smallA__():
     # print_dict(C, 'Edges cost ---------------')
     quality = {}
     for i in range(2,20):
-        V, C, quality[i+1] = ita(edges, matod, cost, fracs=np.ones(i+1)/(i+1), verbose=True)
+        V, C, quality[i+1] = ita(edges, matod, cost, fracs=np.ones(i+1)/(i+1), verbose=False)
 
     plt.close('all')
     plt.plot(quality.keys(), quality.values())
@@ -211,4 +213,4 @@ def __test_dijkstra__():
 
 if __name__ == '__main__':
     # __test_dial__()
-    __test_smallA__()
+    __test_small__()
