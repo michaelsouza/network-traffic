@@ -2,6 +2,7 @@ import numpy as np
 import heapq
 import pandas as pd
 import matplotlib.pyplot as plt
+import Queue
 
 def load_matod(filename):
     # read matod
@@ -47,7 +48,7 @@ def dijkstra_multipath(G, i, dtol=0.01, verbose=False):
             if dijk < di[k]:
                 if verbose: print '   update k = %2d, dijk = %4.2lf' % (k, dijk)
                 di[k] = float(dijk)
-                # remove not equivalent path
+                # remove not equivalent paths
                 for z in pred[k].keys():
                     (z, dizk) = pred[k][z]
                     if abs(dizk - dijk) / dijk > dtol:
@@ -107,79 +108,10 @@ def print_dijkstra_path(i, j, p):
     print(s)
     return s
 
-def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
-    if fracs is None:
-        fracs = np.ones(100)/100
-
-    if sum(fracs) < 0.99:
-        raise Exception('The input sum(fracs) must be equal to one.')
-
-    assert isinstance(edges, pd.DataFrame)
-
-    # read nodes from edges
-
-    if verbose: print 'ITA'
-    if verbose: print '   Creating data structures'
-    T = {}  # time
-    K = {}  # capacity
-    V = {}  # volumes
-    C = {}  # cost
-    for index, row in edges.iterrows():
-        i = int(row.o)
-        j = int(row.d)
-        if i not in T.keys():
-            T[i] = {}
-            K[i] = {}
-            V[i] = {}
-            C[i] = {}
-        if j not in T.keys():
-            T[j] = {}
-            K[j] = {}
-            V[j] = {}
-            C[j] = {}
-        if j not in T[i]:
-            T[i][j] = row.ftt
-            K[i][j] = row.capacity
-            V[i][j] = 0
-            C[i][j] = 0
-
-    assert isinstance(matod, dict)
-    if verbose: print '   Finding shortest paths'
-    iter = 0
-    for f in fracs:
-        for i in matod.keys():
-            if verbose: print 'Find paths from node %d' % i
-            # find shortest path from i to all nodes
-            c, p = dijkstra(C, i) # cost and predecessors
-
-            # update volumes
-            for j in matod[i].keys():
-                if verbose: print_dijkstra_path(i, j, p)
-                ej = j # edge end node
-                while True:
-                    ei = p[ej] # edge begin node
-                    # update volume
-                    V[ei][ej] += matod[i][j] * f
-                    # path origin has been found
-                    if ei == i: break
-                    ej = ei
-
-        # update costs
-        for i in V.keys():
-            for j in V[i].keys():
-                C[i][j] = cost(V[i][j], T[i][j], K[i][j])
-
-        # view V and C
-        if verbose: print_dict(V, 'Vols iter %d' % iter)
-        if verbose: print_dict(C, 'Cost iter %d' % iter)
-        iter += 1
-
-    quality = traffic_assignment_quality(matod, V, C)
-    return V, C, quality
 
 def ita(edges, matod, cost, fracs=None, verbose=False):
     if fracs is None:
-        fracs = np.ones(100)/100
+        fracs = [0.7, .1, .1, .1]
 
     if sum(fracs) < 0.99:
         raise Exception('The input sum(fracs) must be equal to one.')
@@ -209,7 +141,7 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
             T[i][j] = row.ftt
             K[i][j] = row.capacity
             V[i][j] = 0
-            C[i][j] = 0
+            C[i][j] = T[i][j]
 
     assert isinstance(matod, dict)
     if verbose: print '   Finding shortest paths'
@@ -242,8 +174,80 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
         if verbose: print_dict(C, 'Cost iter %d' % iter)
         iter += 1
 
-    quality = traffic_assignment_quality(matod, V, C)
-    return V, C, quality
+    if verbose: traffic_assignment_quality(matod, V, C)
+
+    return V, C
+
+
+def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
+    if fracs is None:
+        fracs = [.7,.1,.1,.1]
+
+    if sum(fracs) < 0.99:
+        raise Exception('The input sum(fracs) must be equal to one.')
+
+    assert isinstance(edges, pd.DataFrame)
+
+    if verbose: print 'ITA'
+    if verbose: print '   Creating data structures'
+    T = {}  # time
+    K = {}  # capacity
+    V = {}  # volumes
+    C = {}  # cost
+    for index, row in edges.iterrows():
+        i = int(row.o)
+        j = int(row.d)
+        if i not in T.keys():
+            T[i] = {}
+            K[i] = {}
+            V[i] = {}
+            C[i] = {}
+        if j not in T.keys():
+            T[j] = {}
+            K[j] = {}
+            V[j] = {}
+            C[j] = {}
+        if j not in T[i]:
+            T[i][j] = row.ftt
+            K[i][j] = row.capacity
+            V[i][j] = 0
+            C[i][j] = T[i][j]
+
+    assert isinstance(matod, dict)
+    if verbose: print '   Finding shortest paths'
+    iter = 0
+    for f in fracs:
+        for i in matod.keys():
+            if verbose: print 'Find paths from node %d' % i
+            # find shortest path from i to all nodes
+            c, p = dijkstra_multipath(C, i) # cost and predecessors
+
+            # update volumes
+            q = []
+            for j in matod[i].keys():
+                heapq.heappush(q, (matod[i][j] * f, j))
+                while len(q) > 0:
+                    (vj, ej) = heapq.heappop(q)
+                    dv = vj / len(p[ej])
+                    # volume divided by the number of alternative paths
+                    for ei in p[ej].keys(): # predecessors
+                        # update volume
+                        V[ei][ej] += dv
+                        if(ei is not i):
+                            heapq.heappush(q, (dv, ei))
+
+        # update costs
+        for i in V.keys():
+            for j in V[i].keys():
+                C[i][j] = cost(V[i][j], T[i][j], K[i][j])
+
+        # view V and C
+        if verbose: print_dict(V, 'Vols iter %d' % iter)
+        if verbose: print_dict(C, 'Cost iter %d' % iter)
+        iter += 1
+
+        if verbose: traffic_assignment_quality(matod, V, C, verbose)
+    return V, C
 
 
 def traffic_assignment_quality(matod, V, C, verbose=False):
@@ -271,6 +275,15 @@ def traffic_assignment_quality(matod, V, C, verbose=False):
 
     return quality
 
+
+def print_dict(V, label):
+    print label
+    assert isinstance(V, dict)
+    for i in V.keys():
+        for j in V[i].keys():
+            if V[i][j] > 0: print '   i = %2d, j = %2d value = %g' % (i, j, V[i][j])
+
+
 def __test_dial__():
     # load instance
     edges = pd.read_csv('../instances/dial_edges.txt', sep=' ')
@@ -281,15 +294,7 @@ def __test_dial__():
     ita(edges, matod, cost)
 
 
-def print_dict(V, label):
-    print label
-    assert isinstance(V, dict)
-    for i in V.keys():
-        for j in V[i].keys():
-            print '   i = %2d, j = %2d value = %g' % (i, j, V[i][j])
-
-
-def __test_small__():
+def __test_ita__():
     # load instance
     edges = pd.read_csv('../instances/smallA_edges.txt', sep=' ')
     # load matod
@@ -297,19 +302,41 @@ def __test_small__():
     # cost function
     cost = lambda xij, tij, kij: tij + (xij / kij)
 
-    V, C, quality = ita(edges, matod, cost)
+    V, C = ita(edges, matod, cost)
+    traffic_assignment_quality(matod, V, C, verbose=True)
+
+    V, C = ita_multipath(edges, matod, cost)
+    traffic_assignment_quality(matod, V, C, verbose=True)
+
+    # print edges
+    # print 'matod = ', matod
+    # print_dict(V, 'Edges volume -------------')
+    # print_dict(C, 'Edges cost ---------------')
+
+
+def __test_ita_convergence__():
+    # load instance
+    edges = pd.read_csv('../instances/dial_edges.txt', sep=' ')
+    # load matod
+    matod = load_matod('../instances/dial_od.txt')
+    # cost function
+    cost = lambda xij, tij, kij: tij + (xij / kij)
+
     # print edges
     # print 'matod = ', matod
     # print_dict(V, 'Edges volume -------------')
     # print_dict(C, 'Edges cost ---------------')
     quality = {}
     for i in range(2,20):
-        V, C, quality[i+1] = ita(edges, matod, cost, fracs=np.ones(i+1)/(i+1), verbose=False)
+        # V, C = ita(edges, matod, cost, fracs=np.ones(i+1)/(i+1))
+        V, C = ita_multipath(edges, matod, cost, fracs=np.ones(i + 1) / (i + 1))
+        quality[i + 1] = traffic_assignment_quality(matod, V, C)
 
     plt.close('all')
     plt.plot(quality.keys(), quality.values())
     plt.xlabel('Number of packages')
     plt.ylabel('Accuracy')
+    plt.title('ITA+MULTIPATH')
     plt.show()
 
 
@@ -343,5 +370,6 @@ def __test_dijkstra_multipath__():
 
 if __name__ == '__main__':
     # __test_dial__()
-    # __test_small__()
-    __test_dijkstra_multipath__()
+    # __test_dijkstra_multipath__()
+    # __test_ita__()
+    __test_ita_convergence__()
