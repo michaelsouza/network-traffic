@@ -186,10 +186,6 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
 
     assert isinstance(edges, pd.DataFrame)
 
-    # todo Remove unused variable nodes
-    # read nodes from edges
-    nodes = []
-
     if verbose: print 'ITA'
     if verbose: print '   Creating data structures'
     T = {}  # time
