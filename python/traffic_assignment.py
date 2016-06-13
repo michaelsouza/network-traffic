@@ -17,6 +17,56 @@ def load_matod(filename):
     return matod
 
 
+def dijkstra_multipath(G, i, verbose=False):
+    assert isinstance(G, dict)
+    dtol = 0.01
+    d = {}
+    p = {}
+    v = {}
+    for j in G.keys():
+        d[j] = np.inf  # d[i] = distance to node i
+        p[j] = 0  # p[i] = predecessor of node i
+        v[j] = False  # v[i] is True if node is already visited False otherwise
+
+    # init
+    h = []
+    heapq.heappush(h, (0, i))
+    d[i] = 0
+    p[i] = i
+    while len(h) > 0:
+        J = []
+        D = []
+        # find all equivalent paths
+        while len(h) > 0:
+            (dij, j) = heapq.heappop(h)
+            # add alternative node
+            if (len(J) == 0) or ((dij - D[0])/D[0] < dtol): 
+                J.append(j)
+                D.append(dij)
+                continue
+            # reinsert node j - it's not an equivalent alternative
+            heappush(h, (dij, j))
+            break
+
+        if verbose: 
+            for k in range(len(J)):
+                print 'j = %2d, dij = %4.2lf' % (J[k], D[k])
+        
+        for q in range(len(J)):
+            j = J[q]
+            # already visited
+            if v[j]: continue
+            dij = D[q]
+            for k in G[j]:
+                dijk = dij + G[j][k]
+                if dijk < d[k]:
+                    if verbose: print '   k = %2d, dijk = %4.2lf' % (k, dijk)
+                    d[k] = dijk
+                    p[k] = j
+                    heapq.heappush(h, (dijk, k))
+            v[j] = True
+    return d, p
+
 def dijkstra(G, i, verbose=False):
     assert isinstance(G, dict)
     d = {}
