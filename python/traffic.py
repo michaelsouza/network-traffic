@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import norm
 from scipy.stats import lognorm
 from types import *
+from traffic_assignment import dijkstra
 
 
 def numberOfLines(filename):
@@ -253,8 +254,15 @@ class MatOD(object):
                     else:
                         fid.write(',')
 
-    def get_table(this):
-        return pd.DataFrame({'dij': this.dij, 'vij': this.vij, 'tt': this.tt, 'vol': this.vol})
+    def get_table(self):
+        return pd.DataFrame({'dij': self.dij, 'vij': self.vij, 'tt': self.tt, 'vol': self.vol})
+
+
+class FlowTA(object):
+    def __init__(self, filename, city=None):
+        print 'Reading flow file', filename
+        self.table = pd.read_csv(filename, sep=' ')
+        self.tt = create_graph(self.table.s, self.table.t, self.table.tt)
 
 
 def hist(x, weights=None, bins=10, distname='normal', color='b', label='pdf', filename=None):
@@ -303,13 +311,103 @@ def hist(x, weights=None, bins=10, distname='normal', color='b', label='pdf', fi
         plt.savefig(filename, bbos_inches='tight')
 
 
-def analyse_tt(tabA, tabB):
-    raise Exception('NotImplementedMethod')
+def create_graph(i, j, v):
+    print 'Creating graph'
+    G = {}
+    for k in range(len(i)):
+        if not G.has_key(i[k]):
+            G[i[k]] = {}
+        if not G[i[k]].has_key(j[k]):
+            G[i[k]][j[k]] = v[k]
+        else:
+            raise Exception('Duplicated entry has been found')
+    return G
 
+def missing_nodes(N, G):
+    # check matod nodes
+    missing_nodes = []
+    for i in G.keys():
+        if not (i in missing_nodes or i in N):
+            print 'missing vertex %d' % i
+            missing_nodes.append(i)
+        for j in G[i].keys():
+            if not (j in missing_nodes or j in N):
+                print 'missing vertex %d' % j
+                missing_nodes.append(j)
+    return missing_nodes
 
 if __name__ == '__main__':
+    # read nodes
+    print 'Reading nodes'
+    nodes = pd.read_csv('/home/michael/mit/ods_and_roads/porto/porto_nodes_algbformat.txt', sep=' ')
+    N = nodes["#nid"].as_matrix()
+
+    print 'Reading edges'
+    edges = pd.read_csv('/home/michael/mit/ods_and_roads/porto/porto_edges_algbformat.txt', sep=' ')
+    s = edges.source.as_matrix()
+    t = edges.target.as_matrix()
+    c = edges.cost_time.as_matrix()
+    E = create_graph(s, t, c)
+
+    # check edges
+    issues = missing_nodes(N, E)
+    print 'There are %d edge vertices that have no (lat,lon) info.' % len(issues)
+
+    # get travel time graph
+    G = FlowTA('/home/michael/mit/instances/porto_selfishflows_0_10.txt').tt
+
+    # check flow node
+    issues = missing_nodes(N, G)
+    print 'There are %d nodes in FlowTA that have no (lat,lon) info.' % len(issues)
+
+    print 'Reading MatOD'
+    matod = pd.read_csv('/home/michael/mit/ods_and_roads/porto/porto_interod_0_1.txt', sep=' ')
+
+    # convert matod to a graph M
+    o = matod.o.as_matrix() + 1
+    d = matod.d.as_matrix() + 1
+    f = matod.flow.as_matrix()
+    C = create_graph(o, d, f)
+    nrows = len(o)
+
+    # check matod nodes
+    issues = missing_nodes(N, C)
+    print 'There are %d nodes in MatOD that have no (lat,lon) info.' % len(issues)
+
+
+
+    # get original travel times
+    for i in C.keys(): # origins
+        print 'i = ', i
+        c, p = dijkstra(G, i)
+        for j in C[i].keys():
+            C[i][j] = c[j]
+        break
+
+    # add new column
+    T = np.array(nrows, dtype=float)
+    for k in range(nrows):
+        T[k] = C[o[k]][d[k]]
+
+    matod['T'] = pd.Series(T, index=matod.index)
+
     # load city
-    city = City('sfbay')
+    # city = City('porto')
+    # # read traffic assignments
+    # F1 = FlowTA('/home/michael/mit/instances/results/porto_selfishflows_0_btwall_01.txt')
+    # F5 = FlowTA('/home/michael/mit/instances/results/porto_selfishflows_0_btwall_05.txt')
+    #
+    # # get travel time graphs
+    # G1 = F1.tt
+    # G5 = F5.tt
+    #
+    # # get shortest paths cost
+    # T1 = np.array(matod.count(), dtype=float)
+    # T5 = np.array(matod.count(), dtype=float)
+
+    # save result
+    print 'Saving result'
+    matod.to_csv('/home/michael/mit/instances/tables/porto_table_od.csv', sep=' ', index=False)
 
 # # load matod
 #     matod = {'10':[], 'voc_05':[], 'btwall_05':[], 'clus_05':[]}
