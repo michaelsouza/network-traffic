@@ -11,14 +11,14 @@ def load_matod(filename):
     for index, row in table.iterrows():
         if (not matod.has_key(row.o)):
             matod[row.o] = {}
-        if (not matod[row.o].has_key(row.o)):
+        if (not matod[row.o].has_key(row.d)):
             matod[row.o][row.d] = row.vol
         else:
-            matod[row.o][row.d] += row.vol
+            raise Exception('Duplicated entry')
     return matod
 
 
-def dijkstra_multipath(G, i, dtol=0.01, verbose=False):
+def dijkstra_multipath(G, i, dtol=0.05, verbose=False):
     """
 
     :type dtol: float
@@ -39,9 +39,12 @@ def dijkstra_multipath(G, i, dtol=0.01, verbose=False):
     di[i] = 0.0
     pred[i][i] = (i, 0)
     while len(h) > 0:
+        print 'h = ', h
         (dij, j) = heapq.heappop(h)
-        if verbose: print 'j = %2d, dij = %4.2lf' % (j, dij)
+        if verbose: print 'i = %2d, j = %2d, dij = %4.2lf' % (i, j, dij)
+        print 'visited[j] = ', visited[j]
         if visited[j]: continue
+        print 'G[j] = ', G[j]
         for k in G[j]:
             dijk = dij + G[j][k]
             # update shortest path
@@ -71,10 +74,18 @@ def dijkstra(G, i, verbose=False):
     di = {}
     pred = {}
     visited = {}
+
+    # init di and pred
     for j in G.keys():
-        di[j] = np.inf  # d[i] = distance to node i
-        pred[j] = 0  # p[i] = predecessor of node i
-        visited[j] = False  # v[i] is True if node is already visited False otherwise
+        if not di.has_key(j):
+            di[j] = np.inf  # d[i] = distance to node i
+            pred[j] = 0  # p[i] = predecessor of node i
+            visited[j] = False  # v[i] is True if node is already visited False otherwise
+        for k in G[j].keys():
+            if not di.has_key(k):
+                di[k] = np.inf  # d[i] = distance to node i
+                pred[k] = 0  # p[i] = predecessor of node i
+                visited[k] = False  # v[i] is True if node is already visited False otherwise
 
     # init
     h = []
@@ -181,14 +192,14 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
 
 def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
     if fracs is None:
-        fracs = [.7,.1,.1,.1]
+        fracs = [.4,.3,.2,.1]
 
     if sum(fracs) < 0.99:
         raise Exception('The input sum(fracs) must be equal to one.')
 
     assert isinstance(edges, pd.DataFrame)
 
-    if verbose: print 'ITA'
+    if verbose: print 'ITA + MULTIPATH'
     if verbose: print '   Creating data structures'
     T = {}  # time
     K = {}  # capacity
@@ -220,11 +231,12 @@ def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
         for i in matod.keys():
             if verbose: print 'Find paths from node %d' % i
             # find shortest path from i to all nodes
-            c, p = dijkstra_multipath(C, i) # cost and predecessors
+            c, p = dijkstra_multipath(C, i, verbose=True) # cost and predecessors
 
             # update volumes
             q = []
             for j in matod[i].keys():
+                #todo calculate the number of alternative paths for a specific od pair
                 heapq.heappush(q, (matod[i][j] * f, j))
                 while len(q) > 0:
                     (vj, ej) = heapq.heappop(q)
@@ -233,7 +245,7 @@ def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
                     for ei in p[ej].keys(): # predecessors
                         # update volume
                         V[ei][ej] += dv
-                        if(ei is not i):
+                        if ei is not i:
                             heapq.heappush(q, (dv, ei))
 
         # update costs
@@ -246,12 +258,13 @@ def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
         if verbose: print_dict(C, 'Cost iter %d' % iter)
         iter += 1
 
-        if verbose: traffic_assignment_quality(matod, V, C, verbose)
+    if verbose: traffic_assignment_quality(matod, V, C, verbose)
     return V, C
 
 
 def traffic_assignment_quality(matod, V, C, verbose=False):
     assert isinstance(matod, dict)
+    assert isinstance(V, dict)
     assert isinstance(C, dict)
 
     total_path_cost = 0
@@ -291,7 +304,9 @@ def __test_dial__():
     matod = load_matod('../instances/dial_od.txt')
     # cost function from Dial2006
     cost = lambda xij, tij, kij: tij * (1 + 0.15 * (xij / kij) ** 4)
-    ita(edges, matod, cost)
+    V, C = ita_multipath(edges, matod, cost)
+    # V, C = ita(edges, matod, cost)
+    traffic_assignment_quality(matod, V, C, verbose=True)
 
 
 def __test_ita__():
@@ -300,12 +315,13 @@ def __test_ita__():
     # load matod
     matod = load_matod('../instances/smallA_od.txt')
     # cost function
-    cost = lambda xij, tij, kij: tij + (xij / kij)
+    # cost = lambda xij, tij, kij: tij + (xij / kij)
+    cost = lambda xij, tij, kij: tij * (1 + 0.15 * (xij / kij) ** 4)
 
-    V, C = ita(edges, matod, cost)
+    V, C = ita(edges, matod, cost, fracs=[0.1,.1,.8], verbose=True)
     traffic_assignment_quality(matod, V, C, verbose=True)
 
-    V, C = ita_multipath(edges, matod, cost)
+    V, C = ita_multipath(edges, matod, cost, fracs=[0.1,.1,.8], verbose=True)
     traffic_assignment_quality(matod, V, C, verbose=True)
 
     # print edges
@@ -320,16 +336,16 @@ def __test_ita_convergence__():
     # load matod
     matod = load_matod('../instances/dial_od.txt')
     # cost function
-    cost = lambda xij, tij, kij: tij + (xij / kij)
-
+    # cost = lambda xij, tij, kij: tij + (xij / kij)
+    cost = lambda xij, tij, kij: tij * (1 + 0.15 * (xij / kij) ** 4)
     # print edges
     # print 'matod = ', matod
     # print_dict(V, 'Edges volume -------------')
     # print_dict(C, 'Edges cost ---------------')
     quality = {}
     for i in range(2,20):
-        # V, C = ita(edges, matod, cost, fracs=np.ones(i+1)/(i+1))
-        V, C = ita_multipath(edges, matod, cost, fracs=np.ones(i + 1) / (i + 1))
+        # V, C = ita(edges, matod, cost, fracs=np.ones(i + 1)/(i + 1))
+        V, C = ita_multipath(edges, matod, cost, fracs=np.ones(i + 1) / (i + 1), verbose=False)
         quality[i + 1] = traffic_assignment_quality(matod, V, C)
 
     plt.close('all')
@@ -350,6 +366,7 @@ def __test_dijkstra__():
 
     d, p = dijkstra(G, 0)
     print d, p
+
 
 def __test_dijkstra_multipath__():
     # load instance
