@@ -339,12 +339,12 @@ def missing_nodes(N, G):
 def create_filtered_matod(city):    
     # read nodes
     print 'Reading nodes'
-    fid = '/home/ascanio/Mit/ods_and_roads/%s/%s_nodes_algbformat.txt'%(city, city)
+    fid = '/home/michael/mit/ods_and_roads/%s/%s_nodes_algbformat.txt'%(city, city)
     nodes = pd.read_csv(fid, sep=' ')
     N = nodes.nid.as_matrix()
 
     print 'Reading MatOD'
-    fid = '/home/ascanio/Mit/ods_and_roads/%s/%s_interod_0_1.txt' %(city, city)
+    fid = '/home/michael/mit/ods_and_roads/%s/%s_interod_0_1.txt' %(city, city)
     matod = pd.read_csv(fid, sep=' ')
 
     print 'Filtering'
@@ -360,13 +360,13 @@ def create_filtered_matod(city):
     matod = matod[b]
 
     print 'Saving file'
-    fid = '/home/ascanio/Mit/instances/tables/%s_table_od.csv' % city
+    fid = '/home/michael/mit/instances/tables/%s_table_od.csv' % city
     matod.to_csv(fid, sep=' ', index=False)
     print 'Done'
 
 def calculate_matod_travel_time(city):
     print 'Reading MatOD'
-    fid = '/home/ascanio/Mit/instances/tables/%s_table_od.csv' % city
+    fid = '/home/michael/mit/instances/tables/%s_table_od.csv' % city
     matod = pd.read_csv(fid, sep=' ')
     
     print 'Creating MatOD graph'
@@ -402,19 +402,19 @@ def calculate_matod_travel_time(city):
 
     table = {'o':o,'d':d,'flow':f}
 
-    C = get_minimial_paths(M, '/home/ascanio/Mit/instances/%s_selfishflows_0_10.txt' % city)
+    C = get_minimial_paths(M, '/home/michael/mit/instances/%s_selfishflows_0_10.txt' % city)
     table['tt'] = get_path_cost_array(o,d,C)
 
-    ranks  = ['btwall', 'voc', 'cluster']    
+    ranks  = ['btwall', 'voc', 'clus']
     alphas = ['1', '5']
     for rank in ranks:
         for alpha in alphas:
-            fid = '/home/ascanio/Mit/instances/results/%s_selfishflows_0_%s_0%s.txt' % (city, rank, alpha)
+            fid = '/home/michael/mit/instances/results/%s_selfishflows_0_%s_0%s.txt' % (city, rank, alpha)
             C = get_minimial_paths(M, fid)
             table['tt_%s_%s' % (rank, alphas)] = get_path_cost_array(o,d,C)
     
     table = pd.DataFrame(table)
-    fid = '/home/ascanio/Mit/instances/tables/%s_tt_od.csv' % city
+    fid = '/home/michael/mit/instances/tables/%s_tt_od.csv' % city
     table.to_csv(fid, sep=' ', index=False)
 
 if __name__ == '__main__':
@@ -429,7 +429,7 @@ if __name__ == '__main__':
     # create_filtered_matod(N, matod)
 
     # print 'Reading edges'
-    # edges = pd.read_csv('/home/ascanio/Mit/ods_and_roads/porto/porto_edges_algbformat.txt', sep=' ')
+    # edges = pd.read_csv('/home/michael/mit/ods_and_roads/porto/porto_edges_algbformat.txt', sep=' ')
     # s = edges.source.as_matrix()
     # t = edges.target.as_matrix()
     # c = edges.cost_time.as_matrix()
@@ -440,7 +440,7 @@ if __name__ == '__main__':
     # print 'There are %d edge vertices that have no (lat,lon) info.' % len(issues)
 
     # # get travel time graph
-    # G = FlowTA('/home/ascanio/Mit/instances/porto_selfishflows_0_10.txt').tt
+    # G = FlowTA('/home/michael/mit/instances/porto_selfishflows_0_10.txt').tt
 
     # # check flow node
     # issues = missing_nodes(N, G)
