@@ -399,6 +399,7 @@ def calculate_matod_travel_time(city):
         c = np.zeros(n)
         for i in range(n):
             c[i] = C[o[i]][d[i]]
+        return c
 
     table = {'o':o,'d':d,'flow':f}
 
