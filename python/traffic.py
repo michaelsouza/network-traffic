@@ -6,7 +6,7 @@ from scipy.stats import norm
 from scipy.stats import lognorm
 from types import *
 from traffic_assignment import dijkstra
-
+import argparse
 
 def numberOfLines(filename):
     # Returns the number of lines in a file without open it
@@ -412,14 +412,21 @@ def calculate_matod_travel_time(city):
         for alpha in alphas:
             fid = '/home/michael/mit/instances/results/%s_selfishflows_0_%s_0%s.txt' % (city, rank, alpha)
             C = get_minimial_paths(M, fid)
-            table['tt_%s_%s' % (rank, alphas)] = get_path_cost_array(o,d,C)
+            table['tt_%s_%s' % (rank, alpha)] = get_path_cost_array(o,d,C)
     
     table = pd.DataFrame(table)
     fid = '/home/michael/mit/instances/tables/%s_tt_od.csv' % city
     table.to_csv(fid, sep=' ', index=False)
 
 if __name__ == '__main__':
-    calculate_matod_travel_time('porto')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("city",help="Sets the city.")
+    args = parser.parse_args()
+    
+    # read input parameters
+    city  = args.city
+    calculate_matod_travel_time(city)
+
     # # convert matod to a graph M
     # o = matod.o.as_matrix()
     # d = matod.d.as_matrix()
