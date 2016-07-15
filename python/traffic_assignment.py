@@ -18,7 +18,7 @@ def load_matod(filename):
     return matod
 
 
-def dijkstra_multipath(G, i, dtol=0.05, verbose=False):
+def dijkstra_multipath(G, i, dtol=0.0001, verbose=False):
     """
 
     :type dtol: float
@@ -29,8 +29,8 @@ def dijkstra_multipath(G, i, dtol=0.05, verbose=False):
     pred = {}
     visited = {}
     for j in G.keys():
-        di[j] = np.inf  # d[i] = distance to node i
-        pred[j] = {}      # p[i] = predecessors of node i
+        di[j]      = 1E+20   # d[i] = distance to node i
+        pred[j]    = {}      # p[i] = predecessors of node i
         visited[j] = False   # v[i] is True if node is already visited False otherwise
 
     # init
@@ -39,12 +39,12 @@ def dijkstra_multipath(G, i, dtol=0.05, verbose=False):
     di[i] = 0.0
     pred[i][i] = (i, 0)
     while len(h) > 0:
-        print 'h = ', h
+        # print 'h = ', h
         (dij, j) = heapq.heappop(h)
         if verbose: print 'i = %2d, j = %2d, dij = %4.2lf' % (i, j, dij)
-        print 'visited[j] = ', visited[j]
+        # print 'visited[j] = ', visited[j]
         if visited[j]: continue
-        print 'G[j] = ', G[j]
+        # print 'G[j] = ', G[j]
         for k in G[j]:
             dijk = dij + G[j][k]
             # update shortest path
@@ -54,13 +54,13 @@ def dijkstra_multipath(G, i, dtol=0.05, verbose=False):
                 # remove not equivalent paths
                 for z in pred[k].keys():
                     (z, dizk) = pred[k][z]
-                    if abs(dizk - dijk) / dijk > dtol:
+                    if (abs(dizk - dijk) / dijk) > dtol:
                         if verbose: print '      remove (%2d, %2d) = %4.2lf' %(z, k, dizk)
                         pred[k].pop(z)
                 pred[k][j] = (j, dijk)
                 heapq.heappush(h, (dijk, k))
             # add equivalent path
-            elif abs(dijk - di[k]) / max(di[k], 1.0) < dtol:
+            elif (abs(dijk - di[k]) / max(di[k], 1.0)) < dtol:
                 if verbose: print '   add   k = %2d, dik = %4.2lf, dijk = %4.2lf' % (k, di[k], dijk)
                 pred[k][j] = (j, dijk)
                 heapq.heappush(h, (dijk, k))
@@ -78,7 +78,7 @@ def dijkstra(G, i, verbose=False):
     # init di and pred
     for j in G.keys():
         if not di.has_key(j):
-            di[j] = np.inf  # d[i] = distance to node i
+            di[j] = 1E+20  # d[i] = distance to node i
             pred[j] = 0  # p[i] = predecessor of node i
             visited[j] = False  # v[i] is True if node is already visited False otherwise
         for k in G[j].keys():
@@ -370,7 +370,8 @@ def __test_dijkstra__():
 
 def __test_dijkstra_multipath__():
     # load instance
-    edges = pd.read_csv('../instances/smallA_edges.txt', sep=' ')
+    # edges = pd.read_csv('../instances/smallA_edges.txt', sep=' ')
+    edges = pd.read_csv('../instances/dial_edges.txt', sep=' ')
 
     # convert edges to graph
     G = {}
@@ -378,15 +379,20 @@ def __test_dijkstra_multipath__():
         if row.o not in G.keys():
             G[row.o] = {}
         G[row.o][row.d] = row.ftt
-    print G
+    #print G
 
     d, p = dijkstra_multipath(G, 1, verbose=True)
     print 'd = ', d
     print 'p = ', p
 
+    for i in p.keys():
+        print '%i ' % i
+        for j in p[i]:
+            print '   %i' % j
+
 
 if __name__ == '__main__':
     # __test_dial__()
-    # __test_dijkstra_multipath__()
+    __test_dijkstra_multipath__()
     # __test_ita__()
-    __test_ita_convergence__()
+    # __test_ita_convergence__()
