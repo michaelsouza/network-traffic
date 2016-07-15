@@ -6,6 +6,7 @@ from scipy.stats import norm
 from scipy.stats import lognorm
 from types import *
 from traffic_assignment import dijkstra
+from traffic_assignment import dijkstra_multipath
 import argparse
 
 def numberOfLines(filename):
@@ -268,7 +269,7 @@ class FlowTA(object):
 def hist(x, weights=None, bins=10, distname='normal', color='b', label='pdf', filename=None):
     # create full data using weights
     z = x
-    if (weights is not None):
+    if weights is not None:
         z = np.zeros(sum(weights))
         j = 0
         for i in range(weights.size):
@@ -280,14 +281,14 @@ def hist(x, weights=None, bins=10, distname='normal', color='b', label='pdf', fi
     hist, bins = np.histogram(x, bins=bins, density=True, weights=weights)
 
     # fit distribution
-    if (distname is 'normal'):
+    if distname is 'normal':
         (mu, sigma) = norm.fit(z)
         pdf = lambda x: norm.pdf(x, mu, sigma)
-    elif (distname is 'lognormal'):
+    elif distname is 'lognormal':
         sigma, loc, scale = lognorm.fit(z, floc=0)
         mu = np.log(scale)
         pdf = lambda x: lognorm.pdf(x, sigma, loc, scale=scale)
-    elif (distname is not None):
+    elif distname is not None:
         raise Exception('Unsupported distribution name ' + distname)
 
     # plot distribution
@@ -323,6 +324,7 @@ def create_graph(i, j, v):
             raise Exception('Duplicated entry has been found')
     return G
 
+
 def missing_nodes(N, G):
     # check matod nodes
     missing_nodes = []
@@ -335,6 +337,7 @@ def missing_nodes(N, G):
                 #print 'missing vertex %d' % j
                 missing_nodes.append(j)
     return missing_nodes
+
 
 def create_filtered_matod(city):    
     # read nodes
@@ -363,6 +366,7 @@ def create_filtered_matod(city):
     fid = '/home/michael/mit/instances/tables/%s_table_od.csv' % city
     matod.to_csv(fid, sep=' ', index=False)
     print 'Done'
+
 
 def calculate_matod_travel_time(city):
     print 'Reading MatOD'
@@ -418,14 +422,65 @@ def calculate_matod_travel_time(city):
     fid = '/home/michael/mit/instances/tables/%s_tt_od.csv' % city
     table.to_csv(fid, sep=' ', index=False)
 
+
+def write_wkt_path(o=1, d=20):
+    # print 'Reading data'
+    flows = pd.read_csv('/home/ascanio/Mit/instances/porto_edges__voc_05.dat', sep=' ')
+    nodes = pd.read_csv('/home/ascanio/Mit/instances/porto_nodes_algbformat.txt', sep=' ')
+
+    # print 'Nodes array'
+    N = {}
+    v = {}
+    for index, row in nodes.iterrows():
+        N[row.nid] = dict(lon=row.lon, lat=row.lat)
+        v[row.nid] = False
+
+    # print 'Building Graph'
+    G = {}
+    E = {}
+    for index, row in flows.iterrows():
+        if row.source not in G.keys():
+            G[row.source] = {}
+            E[row.source] = {}
+        G[row.source][row.target] = row.cost_time
+        E[row.source][row.target] = row.eid
+
+    # print 'Calculating dijkstra_multipath'
+    distance, predecessor = dijkstra_multipath(G, o)
+
+    print 'eid mark'
+    to_visit = [d]
+    while len(to_visit) > 0:
+        i = to_visit[0]
+
+        if i == o: break
+
+        if v[i]:
+            to_visit.pop(0)
+            continue
+
+        v[i] = True
+
+        p = predecessor[i].keys()
+        for j in p:
+            print '%d 1' % int(E[j][i])
+            to_visit.append(j)
+
+
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("city",help="Sets the city.")
     args = parser.parse_args()
-    
+
+    # write wkt path
+    write_wkt_path()
+
     # read input parameters
-    city  = args.city
-    calculate_matod_travel_time(city)
+    # city  = args.city
+    # calculate_matod_travel_time(city)
 
     # # convert matod to a graph M
     # o = matod.o.as_matrix()
