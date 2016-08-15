@@ -4,7 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 from scipy.stats import lognorm
-from types import *
 from traffic_assignment import dijkstra
 from traffic_assignment import dijkstra_multipath
 import argparse
@@ -113,7 +112,6 @@ class City(object):
 class MatOD(object):
     def __init__(this, filename, city=None):
         print('Reading MatOD from ' + filename)
-        assert isinstance(filename, StringType)
         this.name = filename
         npaths = numberOfLines(filename) - 1  # number of paths
         this.o = np.zeros(npaths, dtype=np.int)
@@ -175,7 +173,7 @@ class MatOD(object):
         # saving removed od pairs
         if len(rmod['o']) > 0:
             filename = filename.replace('.txt', '_removed.txt')
-            print '   Saving file %s' % filename
+            print('   Saving file %s' % filename)
             rmod = pd.DataFrame(rmod)
             rmod.to_csv(filename, sep=' ', index=False)
 
@@ -183,16 +181,16 @@ class MatOD(object):
         this.npaths = npaths
         if npaths < this.o.size:
             dsize = this.o.size - npaths
-            print '   Reshaping by eliminating %d paths' % dsize
-            print '      zero_volume       = %5d (#path: %2.1f%% vol: %2.1f%%)  ' % (
+            print('   Reshaping by eliminating %d paths' % dsize)
+            print('      zero_volume       = %5d (#path: %2.1f%% vol: %2.1f%%)  ' % (
             issues['zero_vol']['pth'], 100 * issues['zero_vol']['pth'] / totPth,
-            (100 * issues['zero_vol']['vol']) / totVol)
-            print '      zero_length       = %5d (#path: %2.1f%% vol: %2.1f%%)' % (
+            (100 * issues['zero_vol']['vol']) / totVol))
+            print('      zero_length       = %5d (#path: %2.1f%% vol: %2.1f%%)' % (
             issues['zero_len']['pth'], 100 * issues['zero_len']['pth'] / totPth,
-            (100 * issues['zero_len']['vol']) / totVol)
-            print '      too_slow(>120min) = %5d (#path: %2.1f%% vol: %2.1f%%)' % (
+            (100 * issues['zero_len']['vol']) / totVol))
+            print('      too_slow(>120min) = %5d (#path: %2.1f%% vol: %2.1f%%)' % (
             issues['too_slow']['pth'], 100 * issues['too_slow']['pth'] / totPth,
-            (100 * issues['too_slow']['vol']) / totVol)
+            (100 * issues['too_slow']['vol']) / totVol))
             this.o = this.o[:npaths]
             this.d = this.d[:npaths]
             this.vol = this.vol[:npaths]
@@ -261,7 +259,7 @@ class MatOD(object):
 
 class FlowTA(object):
     def __init__(self, filename, city=None):
-        print 'Reading flow file', filename
+        print('Reading flow file', filename)
         self.table = pd.read_csv(filename, sep=' ')
         self.tt = create_graph(self.table.s, self.table.t, self.table.tt)
 
@@ -313,7 +311,7 @@ def hist(x, weights=None, bins=10, distname='normal', color='b', label='pdf', fi
 
 
 def create_graph(i, j, v):
-    print 'Creating graph'
+    print('Creating graph')
     G = {}
     for k in range(len(i)):
         if not G.has_key(i[k]):
@@ -341,16 +339,16 @@ def missing_nodes(N, G):
 
 def create_filtered_matod(city):    
     # read nodes
-    print 'Reading nodes'
+    print('Reading nodes')
     fid = '/home/michael/mit/ods_and_roads/%s/%s_nodes_algbformat.txt'%(city, city)
     nodes = pd.read_csv(fid, sep=' ')
     N = nodes.nid.as_matrix()
 
-    print 'Reading MatOD'
+    print('Reading MatOD')
     fid = '/home/michael/mit/ods_and_roads/%s/%s_interod_0_1.txt' %(city, city)
     matod = pd.read_csv(fid, sep=' ')
 
-    print 'Filtering'
+    print('Filtering')
     o = matod.o.as_matrix()
     d = matod.d.as_matrix()
     b = [False] * len(o)
@@ -359,37 +357,37 @@ def create_filtered_matod(city):
         if o[k] in N and d[k] in N:
             b[k] = True
             c += 1
-    print 'Number of excluded edges %d of %d' %(len(o) - c, len(o))
+    print('Number of excluded edges %d of %d' %(len(o) - c, len(o)))
     matod = matod[b]
 
-    print 'Saving file'
+    print('Saving file')
     fid = '/home/michael/mit/instances/tables/%s_table_od.csv' % city
     matod.to_csv(fid, sep=' ', index=False)
-    print 'Done'
+    print('Done')
 
 
 def calculate_matod_travel_time(city):
-    print 'Reading MatOD'
+    print('Reading MatOD')
     fid = '/home/michael/mit/instances/tables/%s_table_od.csv' % city
     matod = pd.read_csv(fid, sep=' ')
     
-    print 'Creating MatOD graph'
+    print('Creating MatOD graph')
     o = matod.o.as_matrix()
     d = matod.d.as_matrix()
     f = matod.flow.as_matrix()
     M = create_graph(o,d,f)
 
     def get_minimial_paths(M, fid):
-        print 'Reading Flow %s' % fid        
+        print('Reading Flow %s' % fid)
         flow = pd.read_csv(fid, sep=' ')
     
-        print 'Creating Flow Graph'
+        print('Creating Flow Graph')
         s = flow.s.as_matrix()
         t = flow.t.as_matrix()
         c = flow.tt.as_matrix()
         F = create_graph(s,t,c)
 
-        print 'Finding minimimal paths'    
+        print('Finding minimimal paths')   
         C = create_graph(o,d,np.zeros(len(o)))
         for i in M.keys():
             c, p = dijkstra(F, i)
@@ -423,10 +421,20 @@ def calculate_matod_travel_time(city):
     table.to_csv(fid, sep=' ', index=False)
 
 
-def write_wkt_path(o=1, d=20):
+def get_path_edges_id(rank, city, o, d):
+    print('Getting paths %s(%6d,%6d) Rank %s\n' %(city, o, d, rank))
     # print 'Reading data'
-    flows = pd.read_csv('/home/ascanio/Mit/instances/porto_edges__voc_05.dat', sep=' ')
-    nodes = pd.read_csv('/home/ascanio/Mit/instances/porto_nodes_algbformat.txt', sep=' ')
+    rankname = rank.replace('tt_','').replace('_1', '_01').replace('_5', '_05')
+    folder = 'C:/Users/Michael/Dropbox/work.network/code/matlab/instances/mit_data/instances'
+    
+    # read flows
+    if rankname == 'tt':    
+        flows = pd.read_csv('%s/%s_selfishflows_0_10.txt' % (folder, city), sep=' ')
+    else:
+        flows = pd.read_csv('%s/results/%s_selfishflows_0_%s.txt' % (folder, city, rankname), sep=' ')
+    
+    # read nodes
+    nodes = pd.read_csv('%s/%s_nodes_algbformat.txt'%(folder, city), sep=' ')
 
     # print 'Nodes array'
     N = {}
@@ -439,44 +447,104 @@ def write_wkt_path(o=1, d=20):
     G = {}
     E = {}
     for index, row in flows.iterrows():
-        if row.source not in G.keys():
-            G[row.source] = {}
-            E[row.source] = {}
-        G[row.source][row.target] = row.cost_time
-        E[row.source][row.target] = row.eid
+        if row.s not in G.keys():
+            G[row.s] = {}
+            E[row.s] = {}
+        G[row.s][row.t] = row.tt
+        E[row.s][row.t] = row.gid
 
     # print 'Calculating dijkstra_multipath'
     distance, predecessor = dijkstra_multipath(G, o)
 
-    print 'eid mark'
+    # set output (edges_ids)
+    edges_ids = [];
     to_visit = [d]
     while len(to_visit) > 0:
         i = to_visit[0]
-
         if i == o: break
-
         if v[i]:
             to_visit.pop(0)
             continue
-
         v[i] = True
-
         p = predecessor[i].keys()
         for j in p:
-            print '%d 1' % int(E[j][i])
+            edges_ids.append(int(E[j][i]))
             to_visit.append(j)
+            
+    return edges_ids
 
 
+def write_wkt_paths_using_edges_id(city, effect):
+    # effect = 'negative' # positive | negative
+    
+    # read most affected edges' files
+    filename = 'C:/Users/Michael/Dropbox/work.network/code/matlab/instances/mit_data/instances/tables/%s_most_%sly_affected_edges.txt' % (city, effect)
 
+    # group paths (edges) by ranks
+    edges_by_ranks = dict()
+    od_pairs = dict()
+    with open(filename, 'r') as fid:
+        for row in fid.readlines():
+            if(len(row) == 0): continue
+            tokens = row.split(';')
+            rank   = tokens[0]
+            edges_by_ranks[rank] = []
+            od_pairs[rank] = dict(o=[], d=[])
+            for k in range(1,len(tokens)):
+                od_pair = tokens[k].split(' ')
+                o = int(od_pair[0])
+                d = int(od_pair[1])
+                edges_by_ranks[rank].append(get_path_edges_id(rank, city, o, d))
+                od_pairs[rank]['o'].append(o)
+                od_pairs[rank]['d'].append(d)
+    
+    for rank in edges_by_ranks.keys():
+        paths = edges_by_ranks[rank]
+        o = od_pairs[rank]['o']
+        d = od_pairs[rank]['d']
+        npairs = len(o)
+        # write od pairs
+        filename = '%s_wkt_od_%s_%s.csv' % (city, rank, effect)
+        with open(filename, 'w') as fid:
+            fid.write('pid o d\n')
+            for pid in range(npairs):
+                fid.write('%d %d %d\n' %(pid, o[pid], d[pid]))
 
+        # set all edges ids
+        all_edges_ids = []
+        for path in paths:
+            for eid in path:
+                if eid not in all_edges_ids:
+                    all_edges_ids.append(eid)            
+
+        # write edges
+        filename = '%s_wkt_paths_%s_%s.csv' % (city, rank, effect)   
+        with open(filename, 'w') as fid:
+            # write column headers
+            fid.write('eid ')
+            for pid in range(len(paths)): # pid = path id
+                fid.write('path_%d ' % pid)
+            fid.write('\n')
+           
+            # write rows (0:not included | 1:included)
+            for eid in all_edges_ids:
+                fid.write('%d ' % eid)
+                for pid in range(len(paths)):
+                    if eid in paths[pid]:
+                        fid.write('1 ')
+                    else:
+                        fid.write('0 ')
+                fid.write('\n')
+                
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("city",help="Sets the city.")
-    args = parser.parse_args()
+    #parser = argparse.ArgumentParser()
+    #parser.add_argument("city",help="Sets the city.")
+    #args = parser.parse_args()
 
     # write wkt path
-    write_wkt_path()
+    write_wkt_paths_using_edges_id('boston', 'positive')
+    write_wkt_paths_using_edges_id('boston', 'negative')
 
     # read input parameters
     # city  = args.city

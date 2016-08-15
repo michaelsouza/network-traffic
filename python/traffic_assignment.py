@@ -2,7 +2,7 @@ import numpy as np
 import heapq
 import pandas as pd
 import matplotlib.pyplot as plt
-import Queue
+import queue
 
 def load_matod(filename):
     # read matod
@@ -41,7 +41,7 @@ def dijkstra_multipath(G, i, dtol=0.0001, verbose=False):
     while len(h) > 0:
         # print 'h = ', h
         (dij, j) = heapq.heappop(h)
-        if verbose: print 'i = %2d, j = %2d, dij = %4.2lf' % (i, j, dij)
+        if verbose: print('i = %2d, j = %2d, dij = %4.2lf' % (i, j, dij))
         # print 'visited[j] = ', visited[j]
         if visited[j]: continue
         # print 'G[j] = ', G[j]
@@ -49,19 +49,23 @@ def dijkstra_multipath(G, i, dtol=0.0001, verbose=False):
             dijk = dij + G[j][k]
             # update shortest path
             if dijk < di[k]:
-                if verbose: print '   update k = %2d, dijk = %4.2lf' % (k, dijk)
+                if verbose: print('   update k = %2d, dijk = %4.2lf' % (k, dijk))
                 di[k] = float(dijk)
                 # remove not equivalent paths
+                preds2remove = [];
                 for z in pred[k].keys():
                     (z, dizk) = pred[k][z]
                     if (abs(dizk - dijk) / dijk) > dtol:
-                        if verbose: print '      remove (%2d, %2d) = %4.2lf' %(z, k, dizk)
-                        pred[k].pop(z)
+                        preds2remove.append(z)
+                for z in preds2remove:
+                    if verbose: print('      remove (%2d, %2d) = %4.2lf' %(z, k, dizk))
+                    pred[k].pop(z)
+                # update
                 pred[k][j] = (j, dijk)
                 heapq.heappush(h, (dijk, k))
             # add equivalent path
             elif (abs(dijk - di[k]) / max(di[k], 1.0)) < dtol:
-                if verbose: print '   add   k = %2d, dik = %4.2lf, dijk = %4.2lf' % (k, di[k], dijk)
+                if verbose: print('   add   k = %2d, dik = %4.2lf, dijk = %4.2lf' % (k, di[k], dijk))
                 pred[k][j] = (j, dijk)
                 heapq.heappush(h, (dijk, k))
 
@@ -94,12 +98,12 @@ def dijkstra(G, i, verbose=False):
     pred[i] = i
     while len(h) > 0:
         (dij, j) = heapq.heappop(h)
-        if verbose: print 'j = %2d, dij = %4.2lf' % (j, dij)
+        if verbose: print('j = %2d, dij = %4.2lf' % (j, dij))
         if visited[j]: continue
         for k in G[j]:
             dijk = dij + G[j][k]
             if dijk < di[k]:
-                if verbose: print '   k = %2d, dijk = %4.2lf' % (k, dijk)
+                if verbose: print('   k = %2d, dijk = %4.2lf' % (k, dijk))
                 di[k] = dijk
                 pred[k] = j
                 heapq.heappush(h, (dijk, k))
@@ -129,8 +133,8 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
 
     assert isinstance(edges, pd.DataFrame)
 
-    if verbose: print 'ITA'
-    if verbose: print '   Creating data structures'
+    if verbose: print('ITA')
+    if verbose: print('   Creating data structures')
     T = {}  # time
     K = {}  # capacity
     V = {}  # volumes
@@ -155,11 +159,11 @@ def ita(edges, matod, cost, fracs=None, verbose=False):
             C[i][j] = T[i][j]
 
     assert isinstance(matod, dict)
-    if verbose: print '   Finding shortest paths'
+    if verbose: print('   Finding shortest paths')
     iter = 0
     for f in fracs:
         for i in matod.keys():
-            if verbose: print 'Find paths from node %d' % i
+            if verbose: print('Find paths from node %d' % i)
             # find shortest path from i to all nodes
             c, p = dijkstra(C, i) # cost and predecessors
 
@@ -199,8 +203,8 @@ def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
 
     assert isinstance(edges, pd.DataFrame)
 
-    if verbose: print 'ITA + MULTIPATH'
-    if verbose: print '   Creating data structures'
+    if verbose: print('ITA + MULTIPATH')
+    if verbose: print('   Creating data structures')
     T = {}  # time
     K = {}  # capacity
     V = {}  # volumes
@@ -225,11 +229,11 @@ def ita_multipath(edges, matod, cost, fracs=None, verbose=False):
             C[i][j] = T[i][j]
 
     assert isinstance(matod, dict)
-    if verbose: print '   Finding shortest paths'
+    if verbose: print('   Finding shortest paths')
     iter = 0
     for f in fracs:
         for i in matod.keys():
-            if verbose: print 'Find paths from node %d' % i
+            if verbose: print('Find paths from node %d' % i)
             # find shortest path from i to all nodes
             c, p = dijkstra_multipath(C, i, verbose=True) # cost and predecessors
 
@@ -281,20 +285,20 @@ def traffic_assignment_quality(matod, V, C, verbose=False):
             total_edge_cost += C[i][j] * V[i][j]
 
     quality = total_path_cost/total_edge_cost
-    if verbose: print 'Traffic assignment quality'
-    if verbose: print '   Total path cost %g' % total_path_cost
-    if verbose: print '   Total edge cost %g' % total_edge_cost
-    if verbose: print '   Accuracy        %g' % quality
+    if verbose: print('Traffic assignment quality')
+    if verbose: print('   Total path cost %g' % total_path_cost)
+    if verbose: print('   Total edge cost %g' % total_edge_cost)
+    if verbose: print('   Accuracy        %g' % quality)
 
     return quality
 
 
 def print_dict(V, label):
-    print label
+    print(label)
     assert isinstance(V, dict)
     for i in V.keys():
         for j in V[i].keys():
-            if V[i][j] > 0: print '   i = %2d, j = %2d value = %g' % (i, j, V[i][j])
+            if V[i][j] > 0: print('   i = %2d, j = %2d value = %g' % (i, j, V[i][j]))
 
 
 def __test_dial__():
@@ -365,7 +369,7 @@ def __test_dijkstra__():
          5: {4: 2, 2: 5}}
 
     d, p = dijkstra(G, 0)
-    print d, p
+    print(d, p)
 
 
 def __test_dijkstra_multipath__():
@@ -382,13 +386,13 @@ def __test_dijkstra_multipath__():
     #print G
 
     d, p = dijkstra_multipath(G, 1, verbose=True)
-    print 'd = ', d
-    print 'p = ', p
+    print('d = ', d)
+    print('p = ', p)
 
     for i in p.keys():
-        print '%i ' % i
+        print('%i ' % i)
         for j in p[i]:
-            print '   %i' % j
+            print('   %i' % j)
 
 
 if __name__ == '__main__':
