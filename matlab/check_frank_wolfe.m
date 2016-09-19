@@ -57,14 +57,14 @@ switch method
         % creates graph G
         A = sparse(edges.s, edges.t, edges.ftt, nnodes, nnodes);
         % set initial solution
-        x = zeros(nedges * nflows, 1) + eps;
+        x = zeros(nvars, 1);
         for k = 1:nflows
             i = matod.o(k);
             s = matod.d(k);
             v = matod.vol(k);
             [~,path,~] = graphshortestpath(A,i,s);
             for w = 2:length(path)
-                i   = path(w-1);
+                i   = path(w - 1);
                 j   = path(w);
                 ij  = emap(i,j);
                 xij = xmap.sij2xij(s,ij);
