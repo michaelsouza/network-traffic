@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       158,          7]
-NotebookDataLength[   1922524,      31894]
-NotebookOptionsPosition[   1919800,      31797]
-NotebookOutlinePosition[   1920142,      31812]
-CellTagsIndexPosition[   1920099,      31809]
+NotebookDataLength[   1924676,      31967]
+NotebookOptionsPosition[   1921666,      31861]
+NotebookOutlinePosition[   1922008,      31876]
+CellTagsIndexPosition[   1921965,      31873]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -189,7 +189,7 @@ G.\>\""}], ";"}], "\n",
    3.6810477419662886`*^9, 3.6810477669780135`*^9}, {3.6810478715039554`*^9, 
    3.6810478884746313`*^9}}]
 }, Closed]]
-}, Open  ]],
+}, Closed]],
 
 Cell[CellGroupData[{
 
@@ -31498,7 +31498,7 @@ hhjZJx6ITf3zt0uuCd5oaAz3GFzjdejeRRGamHcFqkthBx0Ih8s76MfTNqfD
 \>"]]
 }, Open  ]]
 }, Open  ]]
-}, Open  ]],
+}, Closed]],
 
 Cell[CellGroupData[{
 
@@ -31746,13 +31746,77 @@ matlab\\\\instances\\\\mit_data\\\\figures\\\\rank_\>\"", ",", "city", ",",
  CellChangeTimes->{{3.6810466754199514`*^9, 3.681046715268134*^9}, 
    3.681046747211358*^9}]
 }, Open  ]]
+}, Closed]],
+
+Cell[CellGroupData[{
+
+Cell["Traffic Assignment", "Chapter",
+ CellChangeTimes->{{3.6825880978541183`*^9, 3.682588101111085*^9}, {
+   3.6825883756882715`*^9, 3.68258837610964*^9}, 3.68327466791403*^9},
+ Background->RGBColor[1, 1, 0.85]],
+
+Cell[BoxData[
+ RowBox[{"ClearAll", "[", 
+  RowBox[{"x", ",", "c", ",", "k", ",", "u"}], "]"}]], "Input",
+ CellChangeTimes->{{3.6832737986729293`*^9, 3.6832738065928984`*^9}, {
+  3.6832740358860483`*^9, 3.6832740463244486`*^9}}],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[
+ RowBox[{"Integrate", "[", 
+  RowBox[{
+   RowBox[{"c", "*", 
+    RowBox[{"(", 
+     RowBox[{"1", "+", 
+      RowBox[{"0.15", "*", 
+       RowBox[{
+        RowBox[{"(", 
+         RowBox[{"u", "/", "k"}], ")"}], "^", "4"}]}]}], ")"}]}], ",", 
+   RowBox[{"{", 
+    RowBox[{"u", ",", "0", ",", "x"}], "}"}]}], "]"}]], "Input",
+ CellChangeTimes->{{3.6832737478609734`*^9, 3.683273783493291*^9}, {
+  3.683274027232388*^9, 3.6832740605898085`*^9}, {3.6832742443027*^9, 
+  3.6832742486052217`*^9}}],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"c", " ", "x"}], "+", 
+  FractionBox[
+   RowBox[{"0.03`", " ", "c", " ", 
+    SuperscriptBox["x", "5"]}], 
+   SuperscriptBox["k", "4"]]}]], "Output",
+ CellChangeTimes->{{3.6832737841403074`*^9, 3.683273808709036*^9}, {
+   3.6832740337475348`*^9, 3.6832740609561057`*^9}, 3.6832742880032663`*^9}]
 }, Open  ]],
 
 Cell[CellGroupData[{
 
-Cell["Traffic Assignement", "Chapter",
- CellChangeTimes->{{3.6825880978541183`*^9, 3.682588101111085*^9}, {
-  3.6825883756882715`*^9, 3.68258837610964*^9}}],
+Cell[BoxData[
+ RowBox[{"Derivative", "[", 
+  RowBox[{
+   RowBox[{"c", "*", 
+    RowBox[{"(", 
+     RowBox[{"1", "+", 
+      RowBox[{"0.15", "*", 
+       RowBox[{
+        RowBox[{"(", 
+         RowBox[{"u", "/", "k"}], ")"}], "^", "4"}]}]}], ")"}]}], ",", "u"}], 
+  "]"}]], "Input",
+ CellChangeTimes->{{3.6832744768948*^9, 3.683274503962773*^9}}],
+
+Cell[BoxData[
+ RowBox[{"Derivative", "[", 
+  RowBox[{
+   RowBox[{"c", " ", 
+    RowBox[{"(", 
+     RowBox[{"1", "+", 
+      FractionBox[
+       RowBox[{"0.15`", " ", 
+        SuperscriptBox["u", "4"]}], 
+       SuperscriptBox["k", "4"]]}], ")"}]}], ",", "u"}], "]"}]], "Output",
+ CellChangeTimes->{3.6832745045093613`*^9}]
+}, Open  ]],
 
 Cell[CellGroupData[{
 
@@ -31818,9 +31882,9 @@ Cell[CellGroupData[{
 Cell[1333, 40, 260, 3, 43, "Subsection"],
 Cell[1596, 45, 6635, 144, 612, "Input"]
 }, Closed]]
-}, Open  ]],
+}, Closed]],
 Cell[CellGroupData[{
-Cell[8280, 195, 92, 1, 63, "Section"],
+Cell[8280, 195, 92, 1, 49, "Section"],
 Cell[CellGroupData[{
 Cell[8397, 200, 100, 1, 43, "Subsection"],
 Cell[CellGroupData[{
@@ -31862,9 +31926,9 @@ Cell[22320, 562, 1886430, 30935, 383, 1853508, 30394, "CachedBoxData", \
 "BoxData", "Output"]
 }, Open  ]]
 }, Open  ]]
-}, Open  ]],
+}, Closed]],
 Cell[CellGroupData[{
-Cell[1908811, 31504, 169, 2, 63, "Section"],
+Cell[1908811, 31504, 169, 2, 49, "Section"],
 Cell[CellGroupData[{
 Cell[1909005, 31510, 113, 1, 34, "Subsubsection"],
 Cell[1909121, 31513, 830, 22, 132, "Input"]
@@ -31883,17 +31947,26 @@ Cell[1916517, 31692, 351, 5, 31, "Output"]
 }, Open  ]],
 Cell[1916883, 31700, 1674, 46, 212, "Input"]
 }, Open  ]]
+}, Closed]],
+Cell[CellGroupData[{
+Cell[1918606, 31752, 212, 3, 69, "Chapter"],
+Cell[1918821, 31757, 227, 4, 31, "Input"],
+Cell[CellGroupData[{
+Cell[1919073, 31765, 504, 14, 31, "Input"],
+Cell[1919580, 31781, 329, 8, 50, "Output"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[1918606, 31752, 156, 2, 64, "Chapter"],
-Cell[CellGroupData[{
-Cell[1918787, 31758, 89, 1, 63, "Section"],
-Cell[1918879, 31761, 364, 12, 31, "Input"],
-Cell[CellGroupData[{
-Cell[1919268, 31777, 176, 4, 31, "Input"],
-Cell[1919447, 31783, 177, 5, 50, "Output"]
+Cell[1919946, 31794, 345, 11, 31, "Input"],
+Cell[1920294, 31807, 322, 10, 50, "Output"]
 }, Open  ]],
-Cell[1919639, 31791, 133, 2, 30, "Text"]
+Cell[CellGroupData[{
+Cell[1920653, 31822, 89, 1, 63, "Section"],
+Cell[1920745, 31825, 364, 12, 31, "Input"],
+Cell[CellGroupData[{
+Cell[1921134, 31841, 176, 4, 31, "Input"],
+Cell[1921313, 31847, 177, 5, 50, "Output"]
+}, Open  ]],
+Cell[1921505, 31855, 133, 2, 30, "Text"]
 }, Open  ]]
 }, Open  ]]
 }
