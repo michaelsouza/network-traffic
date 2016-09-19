@@ -1,11 +1,11 @@
 %% MAIN FUNCTION
 function cost = check_frank_wolfe(options)
 if(nargin < 1)
-    problem = 'smallB';
+    problem = 'dial';
     options = struct(...
-        'DerivativeCheck','on',...
+        'DerivativeCheck','off',...
         'StartPointMethod','ones',...
-        'SolveMethod','fmincon');
+        'SolveMethod','frank_wolfe');
 end
 
 % load data
@@ -23,10 +23,10 @@ if(strcmp(options.DerivativeCheck,'on'))
 end
 
 % solve traffic assignment
-[x,cost] = solve_nlp(edges, matod, xmap, x, Aeq, beq, options.SolveMethod);
+[x,cost] = solve_nlp(edges, xmap, x, Aeq, beq, options.SolveMethod);
 
 % check optimality
-check_optimality(nodes, edges, matod, xmap, x);
+check_optimality(sprintf('fw_paths_%s.csv', problem),nodes, edges, matod, xmap, x);
 
 % set vols (output)
 save_solution(sprintf('fw_sol_%s.csv', problem), edges, xmap, x);
@@ -77,7 +77,7 @@ end
 end
 
 %% SOLVE NLP
-function [x, cost] = solve_nlp(edges, matod, xmap, x,Aeq,beq,method)
+function [x, cost] = solve_nlp(edges, xmap, x,Aeq,beq,method)
 if(nargin < 5)
     method = 'fmincon';
 end
@@ -87,7 +87,7 @@ switch method
     case 'fmincon'
         [x,cost] = solve_nlp_fmincon(edges, xmap, x, Aeq, beq);
     case 'frank_wolfe'
-        [x,cost] = solve_nlp_frank_wolfe(edges, matod, xmap, x, Aeq, beq);
+        [x,cost] = solve_nlp_frank_wolfe(edges, xmap, x, Aeq, beq);
     otherwise
         error('UnkownMethod')
 end
@@ -97,7 +97,7 @@ end
 function [x,cost] = solve_nlp_fmincon(edges, xmap, x, Aeq, beq)
 options = optimoptions('fmincon',...
     'GradObj','on',...
-    'Hessian','on',...
+    'Hessian','off',...
     'DerivativeCheck','off',...
     'Display','iter-detailed',...
     'PlotFcns',@optimplotfval,...
@@ -116,10 +116,13 @@ fprintf('   Final cost: %E\n', cost);
 end
 
 %% SOLVER NLP USING FRANK WOLFE ALGORITHM
-function [x,f] = solve_nlp_frank_wolfe(edges, matod, x, Aeq, beq)
+function [x,fx] = solve_nlp_frank_wolfe(edges, xmap, x, Aeq, beq)
+% See LeBlanc1976
+
+options = optimoptions('linprog','Display','none');
 
 % set algorithm parameters
-maxit = 100;
+maxit = 10000;
 xtol = 1E-3;
 ftol = 1E-3;
 
@@ -129,24 +132,40 @@ b = [];
 lb = zeros(size(x));
 ub = inf(size(x));
 
-% initialization
-[f, g] = bpr(edges, matod, x);
-niter  = 0;
-done   = false;
+% initialization (x is viable)
+[~ , g] = bpr(edges, xmap, x);
+x = linprog(g,A,b,Aeq,beq,lb,ub,x,options);
+[fx, g] = bpr(edges, xmap, x);
+niter = 0;
+done  = false;
 while(~done)
     niter = niter + 1;
     
     % bpr linear approx
-    xnew = linprog(g,A,b,Aeq,beq,lb,ub,x,options);
+    y = linprog(g,A,b,Aeq,beq,lb,ub,x,options);
     
     % line search
-    [fnew,g] = bpr(edges, matod, xnew);
+    d = y - x; % direction
+    f = @(a)bpr(edges, xmap, x + a * d);
+    a = fminbnd(f, 0, 1);
+    y = x + a * d;
+    [fy,g] = bpr(edges, xmap, y);
+    
+    % changes
+    dx = norm(y - x)/max(1,norm(x));
+    df = abs(fy - fx)/max(1,abs(fx));
+    
+    if(mod(niter,20) == 1)
+        fprintf(' iter       fx           dx           df\n')
+        fprintf('------------------------------------------------\n')
+    end
+    fprintf('%5d  %5E  %5E  %5E\n', niter, fy, dx, df);
     
     % stop criteria
-    if(norm(xnew - x)/max(1,norm(x)) < xtol)
+    if(dx < xtol)
         fprintf('   Converged because xtol has been achieved\n');
         done = true;
-    elseif(abs(fnew - f)/max(1,abs(f)) < ftol)
+    elseif(df < ftol)
         fprintf('   Converged because ftol has been achieved\n');
         done = true;
     elseif(niter == maxit)
@@ -155,8 +174,8 @@ while(~done)
     end
     
     % update
-    x = xnew;
-    f = fnew;
+    x = y;
+    fx = fy;
 end
 end
 
@@ -277,15 +296,17 @@ for xij = 1:length(x)
     vij(eij) = vij(eij) + x(xij);
 end
 
-% cost per edge per traveller
+% cost per edge
 yij = (vij ./ edges.cap).^4;
 cij = edges.ftt .* (1 + 0.15 * yij);
+% Cij = Integral[cij(v),v=0..vij]
+Cij = (edges.ftt .* vij) .* (1 + 0.03 * yij);
 
 % total cost
-c = sum(cij .* vij);
+c = sum(Cij);
 
 % gradient
-G = edges.ftt .* (0.75 * yij + 1); % gradient in edge space
+G = cij;            % gradient in edge space
 g = zeros(size(x)); % gradient in x (var) space
 for k = 1:length(xmap.s)
     s = xmap.s(k);
@@ -296,17 +317,17 @@ for k = 1:length(xmap.s)
 end
 
 % hessiana
-H = 3 * edges.ftt .* (vij.^3) ./ (edges.cap.^4);
+% H = 3 * edges.ftt .* (vij.^3) ./ (edges.cap.^4);
 h = zeros(length(x));
-for ij = 1:nedges
-    hij = H(ij);
-    xij = xmap.sij2xij(xmap.s,ij);
-    for i = 1:length(xij)
-        for j = 1:length(xij)
-            h(xij(i),xij(j)) = hij;
-        end
-    end
-end
+% for ij = 1:nedges
+%     hij = H(ij);
+%     xij = xmap.sij2xij(xmap.s,ij);
+%     for i = 1:length(xij)
+%         for j = 1:length(xij)
+%             h(xij(i),xij(j)) = hij;
+%         end
+%     end
+% end
 end
 
 function check_bpr(edges, xmap, x)
@@ -342,28 +363,62 @@ matod = readtable(fid, 'Delimiter', ' ');
 end
 
 %% CHECK OPTIMALITY
-function check_optimality(nodes,edges,matod,xmap,x)
+function check_optimality(filename,nodes,edges,matod,xmap,x,options)
+if(nargin < 7)
+    options = struct('ShowPaths','on');
+end
+
 nflows = length(matod.vol);
 nnodes = length(nodes.nid);
-[cost_per_edge,~,cij] = bpr(edges, xmap, x);
-cost_per_path = 0.0;
+
+% fid to save shortest paths
+if(strcmp(options.ShowPaths,'on'))
+    fid = fopen(filename,'w');
+end
+
+[~,~,~,cij] = bpr(edges, xmap, x);
 G = sparse(edges.s, edges.t, cij, nnodes, nnodes);
+cost_per_path = 0.0;
 for k = 1:nflows
     s = matod.o(k);
     t = matod.d(k);
     vol = matod.vol(k);
-    cost_per_path = cost_per_path + graphshortestpath(G,s,t) * vol;
+    [cost, path] = graphshortestpath(G,s,t);
+    
+    % save path
+    if(strcmp(options.ShowPaths,'on'))
+        fprintf(fid,'(%3d,%3d): ',s,t);
+        for i = 1:length(path)
+            fprintf(fid,'%d ', path(i));
+        end
+        fprintf(fid,'\n');
+    end
+    
+    cost_per_path = cost_per_path + cost * vol;
 end
+
+cost_per_edge = 0.0;
+for k = 1:length(x)
+    eij = xmap.xij2eij(k);
+    cost_per_edge = cost_per_edge + cij(eij) * x(k);
+end
+
+% close shortest path file
+if(strcmp(options.ShowPaths,'on'))
+    fclose(fid);
+end
+
+gap = 1 - cost_per_path / cost_per_edge;
 fprintf('Optimality Analysis\n');
-fprintf('   Cost per path: %3.2E\n', cost_per_path);
-fprintf('   Cost per edge: %3.2E\n', cost_per_edge);
-fprintf('   Gap .........: %3.2f%%\n', 100 * abs(cost_per_path - cost_per_edge)/cost_per_path);
+fprintf('   Cost per path: %5.3E\n', cost_per_path);
+fprintf('   Cost per edge: %5.3E\n', cost_per_edge);
+fprintf('   Gap .........: %3.2f%%\n', 100 * gap);
 end
 
 %% SAVE SOLUTION
 function save_solution(filename, edges, xmap, x)
 nedges = length(edges.gid); % number of edges
-[~,~,cij,vij] = bpr(edges, xmap, x);
+[~,~,~,cij,vij] = bpr(edges, xmap, x);
 vols.flows = zeros(nedges, length(xmap.s));
 for k = 1:length(xmap.s)
     s = xmap.s(k);
