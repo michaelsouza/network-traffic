@@ -5,7 +5,7 @@ if(nargin < 1)
     options = struct(...
         'DerivativeCheck','off',...
         'StartPointMethod','ones',...
-        'SolveMethod','frank_wolfe');
+        'SolveMethod','fmincon');
 end
 
 % load data
@@ -338,28 +338,6 @@ addpath DERIVESTsuite\
 fprintf('   MaxGradError = %f, MaxNumGradError=%f\n',norm(G'-g,Inf),norm(err));
 [H,err] = hessian(@(x)bpr(edges,xmap,x),x);
 fprintf('   MaxHessError = %f, MaxNumHessError=%f\n',norm(H'-h,Inf),norm(err));
-end
-
-%% LOAD DATA
-function [nodes, edges, matod] = load_data(problem)
-fprintf('Reading nodes\n')
-% fid = '/home/michael/mit/ods_and_roads/%s/%s_nodes_algbformat.txt'%(city, city)
-fid = ['../instances/' problem '_nodes.txt'];
-
-fprintf('   %s\n',fid);
-nodes = readtable(fid, 'Delimiter',' ');
-
-fprintf('Reading edges\n')
-% fid = '/home/michael/mit/ods_and_roads/%s/%s_edges_algbformat.txt'%(city, city)
-fid = ['../instances/' problem '_edges.txt'];
-fprintf('   %s\n',fid);
-edges = readtable(fid, 'Delimiter', ' ');
-
-fprintf('Reading MatOD\n')
-% fid = '/home/michael/mit/ods_and_roads/%s/%s_interod_0_1.txt' %(city, city)
-fid = ['../instances/' problem '_od.txt'];
-fprintf('   %s\n',fid);
-matod = readtable(fid, 'Delimiter', ' ');
 end
 
 %% CHECK OPTIMALITY
