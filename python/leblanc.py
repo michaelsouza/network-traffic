@@ -4,6 +4,7 @@ import networkx as nx
 import heapq
 from scipy.optimize import minimize_scalar
 import time
+import multiprocessing
 
 
 def dijkstra(G, s):
@@ -177,13 +178,18 @@ def leblanc(problem,verbose=False):
 
     # init x
     tic = time.time()
-    x = shortestpaths(G,D)
+    # x = shortestpaths(G,D)
+    x = shortestpath_parallel(G,D)
     print('Elapsed time during initialization %.3f seconds' % (time.time() - tic))
+
 
     tic = time.time()
     f, g = bpr(ftt, cap, x, grad=True)
-    print('fobj(x_start) = %5.3E calculated in %3.2f seconds' % (f, time.time() - tic))
+    print('fobj(x_start) = %.8E calculated in %3.2f seconds' % (f, time.time() - tic))
 
+    if len(x) > 0: 
+	    return
+    
     xtol  = 0.01
     niter = 0
     done  = False
@@ -197,8 +203,9 @@ def leblanc(problem,verbose=False):
             G.add_edge(edges.s[k], edges.t[k], eij=k, weight=g[k])
 
         # update y
-        y = shortestpaths(G,D)
-
+        # y = shortestpaths(G,D)
+        y = shortestpath_parallel(G,D)
+		
         # solve line search problem
         d = y - x
         fobj = lambda a: bpr(ftt, cap, x + a * d)
@@ -231,5 +238,45 @@ def leblanc(problem,verbose=False):
     table = pd.DataFrame({'eij':edges.gid, 's':edges.s, 't':edges.t, 'cap':edges.cap, 'ftt':edges.ftt, 'vols':x})
     table.to_csv('sol_%s.csv'%problem,index=False)
 
+class dijkstra_task:
+    def __init__(self, G, D, sources):
+        self.G = G
+        self.D = D
+        self.sources = sources
+
+		
+def dijkstra_worker(task):
+    y = np.zeros(task.G.graph['nedges'])
+    for s in task.sources:
+        dist, pred = dijkstra(task.G, s)
+        for t in task.D.neighbors_iter(s):
+            vol = task.D[s][t]['vol']
+            if dist[t] == np.inf: raise Exception('NonreachableNode: (%d,%d)' % (s, t));
+            k = t
+            while k != s:
+                eij = task.G[pred[k]][k]['eij']
+                y[eij] += vol
+                k = pred[k]
+    return y
+
+
+def shortestpath_parallel(G,D):
+    pool_size = 4 # number of workers
+    tasks = []
+    sources = D.graph['sources']
+    num_sources = len(sources) / pool_size
+    for k in range(pool_size):
+        if k < (pool_size - 1):
+            s = sources[int(k * num_sources):int((k+1) * num_sources)]
+        else:
+            s = sources[int(k * num_sources):]
+        tasks.append(dijkstra_task(G, D, s))
+    pool = multiprocessing.Pool()
+    sols = pool.map(dijkstra_worker, tasks)
+    y = np.zeros(G.graph['nedges'])
+    for k in range(len(sols)):
+        y += sols[k]
+    return y
+
 if __name__ == '__main__':
-    leblanc('porto')
+    leblanc("porto")
