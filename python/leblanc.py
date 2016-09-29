@@ -261,7 +261,8 @@ def dijkstra_worker(task):
 
 
 def shortestpath_parallel(G,D):
-    pool_size = 4 # number of workers
+    # number of workers
+    pool_size = multiprocessing.cpu_count() - 1 
     tasks = []
     sources = D.graph['sources']
     num_sources = len(sources) / pool_size
