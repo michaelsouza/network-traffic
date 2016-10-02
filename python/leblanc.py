@@ -5,6 +5,7 @@ import heapq
 from scipy.optimize import minimize_scalar
 import time
 import multiprocessing
+from contextlib import closing
 
 
 def dijkstra(G, s):
@@ -182,13 +183,12 @@ def leblanc(problem,verbose=False):
     x = shortestpath_parallel(G,D)
     print('Elapsed time during initialization %.3f seconds' % (time.time() - tic))
 
-
     tic = time.time()
     f, g = bpr(ftt, cap, x, grad=True)
     print('fobj(x_start) = %.8E calculated in %3.2f seconds' % (f, time.time() - tic))
 
-    if len(x) > 0: 
-	    return
+    # if len(x) > 0: 
+	    # return
     
     xtol  = 0.01
     niter = 0
@@ -272,8 +272,8 @@ def shortestpath_parallel(G,D):
         else:
             s = sources[int(k * num_sources):]
         tasks.append(dijkstra_task(G, D, s))
-    pool = multiprocessing.Pool()
-    sols = pool.map(dijkstra_worker, tasks)
+    with closing(multiprocessing.Pool()) as pool:
+        sols = pool.map(dijkstra_worker, tasks)
     y = np.zeros(G.graph['nedges'])
     for k in range(len(sols)):
         y += sols[k]
