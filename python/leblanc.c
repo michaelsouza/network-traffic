@@ -206,6 +206,28 @@ void dijkstra(Graph *G, unsigned int s, float *dist, unsigned int *pred){
 	}
 }
 
+void edges_get_properties(Edges edges, int eid, float *cap, float *cap, float *weight){
+	
+}
+
+void edges_set_weight(){
+	
+}
+
+void bpr(Edges edges, size_t n, float *x, float *f, float *g){
+	int i;
+	float y, cap, ftt, f = 0;
+	for(i = 0; i < n; i++){
+		y = pow(x[i] / cap[i], 4);
+		f += (ftt * x[i]) * (1 + 0.03 * y);
+		g[i] = ftt 
+	}
+}
+
+void check_optimality(Graph *G, MatOD matod, Edges edges, float *x){
+	printf("Optimality analysis:\n")
+	
+}
 int main(){
 	Nodes nodes;
 	Edges edges;
