@@ -2,7 +2,6 @@ import numpy as np
 import heapq
 import pandas as pd
 import matplotlib.pyplot as plt
-import queue
 
 def load_matod(filename):
     # read matod
@@ -75,26 +74,26 @@ def dijkstra_multipath(G, i, dtol=0.0001, verbose=False):
 
 def dijkstra(G, i, verbose=False):
     assert isinstance(G, dict)
-    di = {}
-    pred = {}
+    di      = {}
+    pred    = {}
     visited = {}
 
     # init di and pred
     for j in G.keys():
         if not di.has_key(j):
-            di[j] = 1E+20  # d[i] = distance to node i
-            pred[j] = 0  # p[i] = predecessor of node i
-            visited[j] = False  # v[i] is True if node is already visited False otherwise
+            di[j]      = 1E+20      # d[i] = distance to node i
+            pred[j]    = 0          # p[i] = predecessor of node i
+            visited[j] = False      # v[i] is True if node is already visited False otherwise
         for k in G[j].keys():
             if not di.has_key(k):
-                di[k] = np.inf  # d[i] = distance to node i
-                pred[k] = 0  # p[i] = predecessor of node i
+                di[k]      = np.inf # d[i] = distance to node i
+                pred[k]    = 0      # p[i] = predecessor of node i
                 visited[k] = False  # v[i] is True if node is already visited False otherwise
 
     # init
     h = []
     heapq.heappush(h, (0, i))
-    di[i] = 0
+    di[i]   = 0
     pred[i] = i
     while len(h) > 0:
         (dij, j) = heapq.heappop(h)
