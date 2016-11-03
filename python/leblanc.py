@@ -6,7 +6,8 @@ from scipy.optimize import minimize_scalar
 import time
 import multiprocessing
 from contextlib import closing
-
+import os
+import os.path
 
 def dijkstra(G, s):
     dist = {} # dist to each node
@@ -49,36 +50,72 @@ def load_data(problem):
         fid_nodes = '../instances/' + problem + '_nodes.txt'
         fid_edges = '../instances/' + problem + '_edges.txt'
         fid_matod = '../instances/' + problem + '_od.txt'
-    else:
-        wdir = "C:\\Users\\Michael\\Dropbox\\work.network\\code\\matlab\\instances\\mit_data\\instances\\"
+        fid_xsol = 'sol_dial.csv'
+    
+    #ToDo: Code to split the porto_R and identify alpha(A), max_distance(D)
+    
+    if problem in ['porto', 'lisbon', 'rio', 'boston', 'sfbay']:
+        wdir = "../instances/"
+        fid_edges = wdir + '%s_edges_algbformat.txt' % problem
         fid_nodes = wdir + '%s_nodes_algbformat.txt' % problem
-        fid_edges = wdir + '%s_selfishflows_0_10.txt' % problem
-        fid_matod = wdir + '%s_interod_0_1.txt' % problem
+        fid_matod = wdir + '%s_interod_0_1.txt' % problem 
+        fid_xsol = None
+        # fid_edges = wdir + '%s_selfishflows_0_10.txt' % problem
+        # fid_edges = 'sol_porto_0_btwall_01.csv'
+        # fid_edges = wdir + 'results\\%s_selfishflows_0_btwall_01.txt' % problem
+        # fid_edges = 'sol_porto_0_10.csv' % problem # already solved
+        
+    if 'porto_R' in problem:
+        wdir = "../instances/"
+        fid_nodes = wdir + 'porto_nodes_algbformat.txt'
+        fid_matod = wdir + 'porto_interod_0_1.txt'
+        fid_edges = wdir + '%s.csv' % problem
+        # set initial solution file
+        if '_D050' in problem:
+            fid_xsol = 'sol_porto.csv'
+        elif '_D100' in problem:
+            fid_xsol = 'sol_' + problem.replace('_D100', '_D050') + '.csv'
+        elif '_D250' in problem:
+            fid_xsol = 'sol_' + problem.replace('_D250', '_D100') + '.csv'
+        elif '_D500' in problem:
+            fid_xsol = 'sol_' + problem.replace('_D500', '_D250') + '.csv'
     
     print('Reading nodes')
+    print('   %s' % fid_nodes)
     nodes = pd.read_csv(fid_nodes, sep=' ')
     # print(nodes)
 
     print('Reading edges')
+    print('   %s' % fid_edges)
     edges = pd.read_csv(fid_edges, sep=' ')
-    # print(edges)
+    
+    print('Reading solution')
+    x = None
+    if fid_xsol is not None:
+        print('   %s' % fid_xsol)
+        print('Setting user-defined initial point')
+        if fid_xsol is not fid_edges:
+            print('   WARNING: Initial solution is given from different file')
+        xsol = pd.read_csv(fid_xsol)
+        x = xsol.vol
 
     print('Reading MatOD')
+    print('   %s' % fid_matod)
     matod = pd.read_csv(fid_matod, sep=' ')
     
     # removing nodes without edges
     print('Cleaning MatOD matrix')
     print('    Creating edge map') 
-    max_s = np.max(edges.s)
-    max_t = np.max(edges.t)
+    max_s = np.max(edges.source)
+    max_t = np.max(edges.target)
     max_o = np.max(matod.o)
     max_d = np.max(matod.d)
     bmap  = np.zeros(1 + max(max_s,max_t,max_d,max_o), dtype=bool)
-    bmap[edges.s] = True
-    bmap[edges.t] = True
+    bmap[edges.source] = True
+    bmap[edges.target] = True
     print('    Setting keep array') 
     keep = bmap[matod.o] & bmap[matod.d]
-    print('    Removing edges') 
+    print('    Removing unkown edges') 
     matod_o    = matod[keep].o.values
     matod_d    = matod[keep].d.values
     matod_flow = matod[keep].flow.values
@@ -90,7 +127,7 @@ def load_data(problem):
     matod = MatOD(matod_o, matod_d, matod_flow)
     print('    Final number of edges .....: %3.2E' % len(matod.o))
 
-    return nodes, edges, matod
+    return nodes, edges, matod, x
 
 
 def bpr(ftt, cap, x, grad=False):
@@ -129,11 +166,13 @@ def shortestpaths(G, D, verbose=False):
     return y
 
 
-def check_optimality(G, D, edges, x, verbose=False):
+def calculate_costs(G, D, edges, x, verbose=False):
+    print('Optimality analysis: ')
+    tic = time.time()
     # update cost
-    f, g = bpr(edges.ftt, edges.cap, x, grad=True)
+    f, g = bpr(edges.cost_time, edges.capacity, x, grad=True)
     for k in range(len(x)):
-        G.add_edge(edges.s[k], edges.t[k], eij=k, weight=g[k])
+        G.add_edge(edges.source[k], edges.target[k], eij=k, weight=g[k])
 
     # cost per path
     cost_per_path = 0.0
@@ -145,26 +184,28 @@ def check_optimality(G, D, edges, x, verbose=False):
             vol = D[s][t]['vol']
             cost_per_path += dist[t] * vol
     # cost per edge
-    cost_per_edge = np.sum(g * x)
+    cost_time = g * x
+    cost_per_edge = np.sum(cost_time)
     # optimality gap
     gap = 1 - cost_per_path / cost_per_edge
-    print('Optimality analysis: ')
     print('   Cost per path: %E'% cost_per_path)
     print('   Cost per edge: %E'% cost_per_edge)
     print('   Gap .........: %E'% gap)
+    print('   Elapsed time during check_optimality %.3f seconds' % (time.time() - tic))
+    return cost_time
 
 
-def leblanc(problem,verbose=False):
-    nodes, edges, matod = load_data(problem)
-    nedges = len(edges.s)
+def leblanc(problem,xinit=None,verbose=False, check=False):
+    nodes, edges, matod, x = load_data(problem)
+    nedges = len(edges.source)
 
     # Network graph
     print('Creating network graph')
     G = nx.DiGraph(nedges=nedges)
     for k in range(nedges):
-        G.add_edge(edges.s[k], edges.t[k], eij=k, weight=edges.ftt[k])
-    cap = edges.cap
-    ftt = edges.ftt
+        G.add_edge(edges.source[k], edges.target[k], eij=k, weight=edges.cost_time[k])
+    cap = edges.capacity
+    ftt = edges.cost_time
 
     # Graph of demand
     print('Creating demand graph')
@@ -177,34 +218,38 @@ def leblanc(problem,verbose=False):
         for e in G.edges_iter(data=True):
             print('   ', e)
 
+    if check:
+        print('Just checking optimality')
+        calculate_costs(G, D, edges, x)
+        return
+            
     # init x
     tic = time.time()
-    # x = shortestpaths(G,D)
-    x = shortestpath_parallel(G,D)
+    if x is None:
+        print('Setting all-in initial point')
+        x = shortestpaths_parallel(G,D)
     print('Elapsed time during initialization %.3f seconds' % (time.time() - tic))
 
     tic = time.time()
     f, g = bpr(ftt, cap, x, grad=True)
     print('fobj(x_start) = %.8E calculated in %3.2f seconds' % (f, time.time() - tic))
-
-    # if len(x) > 0: 
-	    # return
     
     xtol  = 0.01
     niter = 0
     done  = False
     maxit = 100
     tstart = time.time()
+    xsol = pd.DataFrame({'vol':x})
     while not done:
         tic = time.time()
         # update cost
         f, g = bpr(ftt, cap, x, grad=True)
         for k in range(len(x)):
-            G.add_edge(edges.s[k], edges.t[k], eij=k, weight=g[k])
+            G.add_edge(edges.source[k], edges.target[k], eij=k, weight=g[k])
 
         # update y
         # y = shortestpaths(G,D)
-        y = shortestpath_parallel(G,D)
+        y = shortestpaths_parallel(G,D)
 		
         # solve line search problem
         d = y - x
@@ -223,7 +268,11 @@ def leblanc(problem,verbose=False):
 
         # update x
         x = y
-
+        
+        # save step
+        xsol['vol'] = x
+        xsol.to_csv('xsol_it_%03d.csv' % niter, index=False)
+        
         if niter % 20 == 1:
             print('\n  niter    step size     alpha        fobj         df     itime(sec)')
             print('---------------------------------------------------------------------')
@@ -231,20 +280,28 @@ def leblanc(problem,verbose=False):
     print('\nTotal elapsed time %.3f hours' % ((time.time() - tstart)/3600))
 
     # check optimality
-    check_optimality(G, D, edges, x)
+    cost_time = calculate_costs(G, D, edges, x)
 
+    # cleaning temporary solution files
+    print('Cleaning temporay files')
+    files =  os.listdir('.')
+    for files in files:
+        if file.startswith('xsol_it_'):
+            os.remove(file)
+        
     # save solution
     print('Saving solution')
-    table = pd.DataFrame({'eij':edges.gid, 's':edges.s, 't':edges.t, 'cap':edges.cap, 'ftt':edges.ftt, 'vols':x})
+    table = pd.DataFrame({'gid':edges.eid, 's':edges.source, 't':edges.target, 'cap':edges.capacity, 'ftt':edges.cost_time, 'vol':x, 'cost':cost_time})
     table.to_csv('sol_%s.csv'%problem,index=False)
 
+    
 class dijkstra_task:
     def __init__(self, G, D, sources):
         self.G = G
         self.D = D
         self.sources = sources
-
-		
+	
+	
 def dijkstra_worker(task):
     y = np.zeros(task.G.graph['nedges'])
     for s in task.sources:
@@ -259,8 +316,8 @@ def dijkstra_worker(task):
                 k = pred[k]
     return y
 
-
-def shortestpath_parallel(G,D):
+    
+def shortestpaths_parallel(G,D):
     # number of workers
     pool_size = multiprocessing.cpu_count() - 1 
     tasks = []
@@ -279,5 +336,22 @@ def shortestpath_parallel(G,D):
         y += sols[k]
     return y
 
+    
 if __name__ == '__main__':
-    leblanc("porto")
+    city = 'dial' # dial, porto
+    
+    for city in {'lisbon','boston','sfbay'}:
+        leblanc(city)
+    #ToDo: Loop rank (R), alpha (A) and max_distance (D)
+    #MAX_DIST = [50, 100, 250, 500]
+    #ALPHA = [0.1, 0.2, 0.5, 0.7, 1.0]
+    #RANK = ['voc_id', 'btw_id']
+    # for alpha in ALPHA:
+        # for max_dist in MAX_DIST:
+            # for rank in RANK:
+                # problem = '%s_R%s_A%3.2f_D%03d' % (city, rank, alpha, max_dist)
+                # print('Problem: %s' % problem)
+                # if not os.path.isfile('sol_%s.csv' % problem):
+                    # leblanc(problem)
+                # else:
+                    # print('   Already solved')
