@@ -8,6 +8,7 @@ import multiprocessing
 from contextlib import closing
 import os
 import os.path
+import sys
 
 def dijkstra(G, s):
     dist = {} # dist to each node
@@ -142,6 +143,7 @@ def bpr(ftt, cap, x, grad=False):
 
 
 def shortestpaths(G, D, verbose=False):
+    nonreachable = []
     if verbose: 
         print('G =')
         for e in G.edges_iter(data=True):
@@ -153,12 +155,18 @@ def shortestpaths(G, D, verbose=False):
         if verbose: print('        pred ='%s, pred)
         for t in D.neighbors_iter(s):
             vol = D[s][t]['vol']
-            if dist[t] == np.inf: raise Exception('NonreachableNode: (%d,%d)' % (s,t));
+            if dist[t] == np.inf:
+                nonreachable.append((s,t))
             k = t
             while k != s :
                 eij     = G[pred[k]][k]['eij']
                 y[eij] += vol
                 k       = pred[k]
+    if len(nonreachable) > 0:
+        for (s,t) in nonreachable:
+            print('   NonreachablePair: (%d,%d)' % (s, t))
+        raise Exception('NonreachablePairs');
+        
     if verbose: 
         for e in G.edges_iter():
             eij = G.get_edge_data(*e)['eij']
@@ -285,7 +293,7 @@ def leblanc(problem,xinit=None,verbose=False, check=False):
     # cleaning temporary solution files
     print('Cleaning temporay files')
     files =  os.listdir('.')
-    for files in files:
+    for file in files:
         if file.startswith('xsol_it_'):
             os.remove(file)
         
@@ -303,17 +311,23 @@ class dijkstra_task:
 	
 	
 def dijkstra_worker(task):
+    nonreachable = []
     y = np.zeros(task.G.graph['nedges'])
     for s in task.sources:
         dist, pred = dijkstra(task.G, s)
         for t in task.D.neighbors_iter(s):
             vol = task.D[s][t]['vol']
-            if dist[t] == np.inf: raise Exception('NonreachableNode: (%d,%d)' % (s, t));
+            if dist[t] == np.inf:
+                nonreachable.append((s,t))
             k = t
             while k != s:
                 eij = task.G[pred[k]][k]['eij']
                 y[eij] += vol
                 k = pred[k]
+    if len(nonreachable) > 0:
+        for (s,t) in nonreachable:
+            print('NonreachablePair: (%d,%d)' % (s,t))
+        raise Exception('NonreachablePairs');
     return y
 
     
@@ -338,10 +352,8 @@ def shortestpaths_parallel(G,D):
 
     
 if __name__ == '__main__':
-    city = 'dial' # dial, porto
-    
-    for city in {'lisbon','boston','sfbay'}:
-        leblanc(city)
+    city = str(sys.argv[1])
+    leblanc(city)
     #ToDo: Loop rank (R), alpha (A) and max_distance (D)
     #MAX_DIST = [50, 100, 250, 500]
     #ALPHA = [0.1, 0.2, 0.5, 0.7, 1.0]
