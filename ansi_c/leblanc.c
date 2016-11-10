@@ -35,7 +35,7 @@ void node_read_csv(char *csv_file_name, int *number_of_nodes, Node **nodes) {
 	*number_of_nodes = nlines - 1;
 	*nodes = (Node*) malloc(sizeof(Node) * (*number_of_nodes));
 
-	printf("Reading node file: %s\n", csv_file_name);
+	printf("\nReading node file: %s\n", csv_file_name);
 	rewind(fid);
 	// skipping file header
 	read = getline(&line, &len, fid);
@@ -100,7 +100,7 @@ void edge_read_csv(char *csv_file_name, int *number_of_edges, Edge **edges) {
 	*number_of_edges = nlines - 1;
 	*edges = (Edge*) malloc(sizeof(Edge) * (*number_of_edges));
 
-	printf("Reading edge file: %s\n", csv_file_name);
+	printf("\nReading edge file: %s\n", csv_file_name);
 	rewind(fid);
 	// skipping file header
 	read = getline(&line, &len, fid);
@@ -169,7 +169,7 @@ void matod_read_csv(char *csv_file_name, int *number_of_rows, MatODRow **rows) {
 	*number_of_rows = nlines - 1;
 	*rows = (MatODRow*) malloc(sizeof(MatODRow) * (*number_of_rows));
 
-	printf("Reading MatOD file: %s\n", csv_file_name);
+	printf("\nReading MatOD file: %s\n", csv_file_name);
 	rewind(fid);
 	// skipping file header
 	read = getline(&line, &len, fid);
@@ -206,7 +206,98 @@ void matod_print_array(int number_of_rows, MatODRow *matod) {
 }
 
 
-int main(int argc, char *argv) {
+typedef struct{
+	int *nid; // array of nodes' ids
+	float *cost;
+	size_t len;
+	size_t capacity;
+} Heap;
+
+void heap_init(size_t capacity, Heap *heap){
+	heap->nid = (int*) malloc(sizeof(int) * capacity);
+	heap->cost = (float*) malloc(sizeof(float) * capacity);
+	heap->len = 0;
+	heap->capacity = capacity;
+}
+
+void heap_insertion(Heap *heap, int nid, float cost){
+	if(heap->len == heap->capacity){
+		printf("Heap maximum capacity has been reached.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	// bottom-up
+	size_t node = heap->len, parent;
+	heap->len++;
+	while(node > 0){
+		parent = (node - 1) / 2;
+		if(cost > heap->cost[parent]){
+			heap->nid[node]  = nid;
+			heap->cost[node] = cost;
+			return;
+		}
+		// swap with parent
+		heap->nid[node] = heap->nid[parent];
+		heap->cost[node] = heap->cost[parent];
+		node = parent;
+	}
+	heap->nid[0] = nid;
+	heap->cost[0] = cost;
+}
+
+void heap_pop(Heap *heap, int *nid, float *cost){
+	// set output values
+	*nid = heap->nid[0];
+	*cost = heap->cost[0];
+
+	// update heap - move the last node to the top
+	heap->nid[0] = heap->nid[heap->len - 1];
+	heap->cost[0] = heap->cost[heap->len - 1];
+	heap->len--;
+
+	int node = 0, child, node_nid;
+	float node_cost;
+	// node has one child at least
+	while(2 * node + 1 < heap->len){
+		child = 2 * node + 1;
+		// find the child with smallest cost
+		if(child + 1 < heap->len && heap->cost[child] >	heap->cost[child + 1]){
+			child++;
+		}
+		// heap is ok!
+		node_nid = heap->nid[node];
+		node_cost = heap->cost[node];
+		if(node_cost < heap->cost[child]){
+			break;
+		}
+		// swap
+		heap->nid[node] = heap->nid[child];
+		heap->cost[node] = heap->cost[child];
+		heap->nid[child] = node_nid;
+		heap->cost[child] = node_cost;
+		node = child;
+	}
+}
+
+void heap_print(Heap *heap){
+	int i;
+	printf("Heap (capacity: %zu, len: %zu)\n", heap->capacity, heap->len);
+	if(heap->len == 0){
+		printf("The heap is empty\n");
+		return;
+	}
+	printf("   nid   cost\n");
+	for(i = 0; i < heap->len; i++){
+		printf("%6d %8g\n", heap->nid[i], heap->cost[i]);
+	}
+}
+
+void heap_free(Heap *heap){
+	free(heap->cost);
+	free(heap->nid);
+}
+
+int main(int argc, char **argv) {
 	Node *nodes;
 	Edge *edges;
 	MatODRow *matod;
@@ -224,6 +315,31 @@ int main(int argc, char *argv) {
 	matod_read_csv("../instances/dial_od.txt", &number_of_travels, &matod);
 	matod_print_array(number_of_travels, matod);
 
+	Heap heap;
+	heap_init(10, &heap);
+	heap_insertion(&heap, 5, 8);
+	heap_insertion(&heap, 2, 7);
+	heap_insertion(&heap, 6, 4);
+	heap_insertion(&heap, 1, 9);
+	heap_insertion(&heap, 7, 3);
+	heap_insertion(&heap, 3, 2);
+	heap_insertion(&heap, 4, 1);
+	heap_print(&heap);
+
+	int nid;
+	float cost;
+	heap_pop(&heap, &nid, &cost);
+	printf("nid: %d cost: %g\n",nid, cost);
+	heap_pop(&heap, &nid, &cost);
+	printf("nid: %d cost: %g\n",nid, cost);
+	heap_pop(&heap, &nid, &cost);
+	printf("nid: %d cost: %g\n",nid, cost);
+	heap_print(&heap);
+
+
 	free(nodes);
+	free(edges);
+	free(matod);
+	heap_free(&heap);
 	return EXIT_SUCCESS;
 }
