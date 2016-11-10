@@ -1,6 +1,9 @@
-leblanc.bin: leblanc.c
-	gcc leblanc.c -lm -o leblanc.bin
-	./leblanc.bin
+leblanc: leblanc.c
+	gcc -pg -Wall -Werror leblanc.c -lm -o leblanc
+	
+leblanc_valgrind: leblanc.c
+	gcc -pg -Wall -Werror leblanc.c -lm -o leblanc_valgrind
+	valgrind --tool=memcheck --leak-check=yes  --show-reachable=yes ./leblanc_valgrind
    
-run: leblanc.bin
-	./leblanc.bin
+run: leblanc
+	./leblanc
