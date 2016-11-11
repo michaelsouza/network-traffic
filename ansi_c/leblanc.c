@@ -8,7 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <limits.h>
 
+// Node
 typedef struct {
 	int nid;
 	float lon;
@@ -72,12 +74,14 @@ void node_print_array(int number_of_nodes, Node *nodes) {
 	}
 }
 
+// Edge
 typedef struct {
 	int eid;
 	int source;
 	int target;
 	float capacity;
 	float cost_time;
+	float weight;
 } Edge;
 
 void edge_read_csv(char *csv_file_name, int *number_of_edges, Edge **edges) {
@@ -143,6 +147,32 @@ void edge_print_array(int number_of_edges, Edge *edges) {
 	}
 }
 
+// Returns one if the x index is less than the y one, zero otherwise.
+int edge_is_source_target_indices_less_than(Edge *x, Edge *y){
+	if(x->source < y->source) 1;
+	if(x->source > y->source) 0;
+	return x->target < y->target;
+}
+
+void edge_sort_by_source_target_indices(Edge *edge, int number_of_edges){
+	Edge swap; // swap
+	int i, j;
+	// using bubble sort
+	for(i = 0; i < number_of_edges; i++){
+		for(j = i - 1; j >= 0; j--){
+			if(edge_is_index_less_than(edge[i], edge[j])){
+				// swap
+				swap = edge[i];
+				edge[i] = edge[j];
+				edge[j] = swap;
+			}else{
+				break;
+			}
+		}
+	}
+}
+
+// MatODRow
 typedef struct {
 	int o;
 	int d;
@@ -205,9 +235,9 @@ void matod_print_array(int number_of_rows, MatODRow *matod) {
 	}
 }
 
-
+// Heap
 typedef struct{
-	int *nid; // array of nodes' ids
+	int   *nid; // array of nodes' ids
 	float *cost;
 	size_t len;
 	size_t capacity;
@@ -220,7 +250,7 @@ void heap_init(size_t capacity, Heap *heap){
 	heap->capacity = capacity;
 }
 
-void heap_insertion(Heap *heap, int nid, float cost){
+void heap_push(Heap *heap, int nid, float cost){
 	if(heap->len == heap->capacity){
 		printf("Heap maximum capacity has been reached.\n");
 		exit(EXIT_FAILURE);
@@ -297,11 +327,142 @@ void heap_free(Heap *heap){
 	free(heap->nid);
 }
 
+// Graph (using CSR)
+typedef struct{
+	size_t number_of_nodes;
+	size_t number_of_edges;
+	int *i;    // accessed using one-based index scheme
+	int *j;
+	Edge *eij;
+} Graph;
+
+void graph_init(Graph &G, Edge *edges, int number_of_edges){
+	int i, j, nid, nelem, max_nid, min_nid, source;
+	
+	// memory allocation
+	for(i = 0; i < number_of_edges; i++){
+		nid = edges[i]->source > edges[i]->target ? source : target;
+		if( nid > max_nid ) max_nid = nid;
+		if( nid < min_nid ) min_nid = nid;
+	}
+	G->i = (int *) malloc(sizeof(int) * (max_nid + 2)); // accessed using one-based index
+	G->j = (int *) malloc(sizeof(int) * number_of_edges);
+	for(i = 0; i < (max_nid + 2); i++) G->i[i] = 0;     // cleanup memory 
+	
+	// setup using CSR
+	edge_sort_by_source_target_indices(edges, number_of_edges);
+	nid = min_nid;
+	for(i = 0; i < number_of_edges; i++){
+		G->j[i] = edges[i].target;
+		source = edges[i].source;
+		if(source != nid){
+			for(j = nid + 1; j <= source; j++){
+				G->i[j] = i;
+			}
+			nid = source;
+		}
+	}
+	for(j = nid + 1; j <= (max_nid + 1); j++){
+		G->i[j] = number_of_edges;
+	}
+	
+	G->number_of_edges = number_of_edges;
+	G->number_of_nodes = max_nid;
+	G->eij = edges;
+}
+
+void graph_free(Graph *G){
+	free(G->i);
+	free(G->j);
+}
+
+void graph_neighs(Graph *G, int i, int **neighs, int *nelems){
+	*nelems = G->i[i + 1] - G->i[i]; 
+	*neighs = &(G->j[G->i[i]]); 
+}
+
+void graph_vertex_edges(Graph *G, int v, Edge **edges, int *nedges){
+	*nedges = G->i[v + 1] - G->i[v]; 
+	*edges  = &(G->eij[G->i[v]]); 
+}
+
+// Dijkstra
+typedef struct{
+	int number_of_nodes;
+	float *dist;
+	int   *pred;
+	char  *done;
+	Heap  heap;
+} Dijkstra;
+
+void dijkstra_init(Dijkstra *dijkstra, Graph *G){
+	int i;
+	dijkstra->number_of_nodes = G->number_of_nodes;
+	// memory allocation
+	dijkstra->dist = (float*)malloc(sizeof(float) * G->number_of_nodes);
+	dijkstra->pred = (float*)malloc(sizeof(float) * G->number_of_nodes);
+	dijkstra->done = (float*)malloc(sizeof(float) * G->number_of_nodes);
+	heap_init(G->number_of_nodes, &(dijkstra->heap));
+}
+
+void dijkstra_free(Dijkstra *dijkstra){
+	free(&dijkstra->dist);
+	free(&dijkstra->pred);
+	free(&dijkstra->done);
+	heap_free(&dijkstra->heap);
+}
+
+void dijkstra_reset(Dijkstra *dijkstra){
+	int i;
+	for(i=0; i < dijkstra->number_of_nodes; i++){
+		dijkstra->dist[i] = INFINITY; // LARGE NUMBER
+		dijkstra->pred[i] = -1;       // INVALID INDEX
+		dijkstra->done[i] = 0;        // FALSE
+	}
+	dijkstra->heap.len = 0;
+}
+
+void dijkstra_apply(Dijkstra &dijkstra, Graph *G, int s){
+	float *dist = dijkstra->dist;
+	int   *pred = dijkstra->pred;
+	char  *done = dijkstra->done;
+	Heap  *heap = &(dijkstra->heap);
+	Edge  *edges;
+	
+	float dist_sv, dist_svu;
+	int   i, v, u, *neighs, nedges;
+	
+	dijkstra_reset(dijkstra);
+	dist[s] = 0;
+	pred[s] = s;
+	heap_push(heap, s, 0);
+	while(heap->len > 0){
+		heap_pop(heap, &v, &dist_sv);
+		graph_neighs_edges(G, v, &edges, &nedges);
+		for(i = 0; i < nedges; i++){
+			u = edges[i].target;
+			dist_svu = edges[i].weight;
+			if( dist_svu < dist_u ){
+				dist[u] = dist_svu;
+				pred[u] = v;
+				if(!done[u]){
+					heap_push(heap, u, dist_svu);
+				}
+			}
+		}
+		done[v] = 1;
+	}
+}
+
 int main(int argc, char **argv) {
 	Node *nodes;
 	Edge *edges;
 	MatODRow *matod;
-	int number_of_nodes, number_of_edges, number_of_travels;
+	int number_of_nodes, 
+	    number_of_edges, 
+		number_of_travels;
+	
+	Dijkstra dijkstra;
 
 	// read nodes
 	node_read_csv("../instances/dial_nodes.txt", &number_of_nodes, &nodes);
@@ -317,13 +478,13 @@ int main(int argc, char **argv) {
 
 	Heap heap;
 	heap_init(10, &heap);
-	heap_insertion(&heap, 5, 8);
-	heap_insertion(&heap, 2, 7);
-	heap_insertion(&heap, 6, 4);
-	heap_insertion(&heap, 1, 9);
-	heap_insertion(&heap, 7, 3);
-	heap_insertion(&heap, 3, 2);
-	heap_insertion(&heap, 4, 1);
+	heap_push(&heap, 5, 8);
+	heap_push(&heap, 2, 7);
+	heap_push(&heap, 6, 4);
+	heap_push(&heap, 1, 9);
+	heap_push(&heap, 7, 3);
+	heap_push(&heap, 3, 2);
+	heap_push(&heap, 4, 1);
 	heap_print(&heap);
 
 	int nid;
@@ -335,7 +496,6 @@ int main(int argc, char **argv) {
 	heap_pop(&heap, &nid, &cost);
 	printf("nid: %d cost: %g\n",nid, cost);
 	heap_print(&heap);
-
 
 	free(nodes);
 	free(edges);
