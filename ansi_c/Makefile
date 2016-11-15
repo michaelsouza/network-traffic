@@ -1,5 +1,5 @@
 leblanc: leblanc.c
-	gcc -pg -Wall -Werror leblanc.c -lm -o leblanc
+	gcc -Wall -Werror leblanc.c -lm -o leblanc
 	
 leblanc_valgrind: leblanc.c
 	gcc -pg -Wall -Werror leblanc.c -lm -o leblanc_valgrind
