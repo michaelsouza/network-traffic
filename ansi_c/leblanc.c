@@ -780,7 +780,7 @@ int bpr_linesearch(const Graph *G, const double *x, const double *d, double *y, 
 	size_t n = G->number_of_edges;
     double stp = 1.0;
     double finit, dginit = 0., dgtest;
-    const double dec = 0.5, min_step = 1E-8, max_step = 1.0, ftol = 0.2;
+    const double dec = 0.9, min_step = 1E-8, max_step = 1.0, ftol = 0.2;
 
 	/* Compute the initial gradient in the search direction. */
 	bpr(G, x, f, g);
@@ -854,7 +854,7 @@ void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
 	}
 }
 
-// xsol_write_csv
+// xsol file
 void xsol_write_csv(const char *filename, Graph *G, double *x, double *g){
 	FILE *fid = fopen(filename, "w");
 	if(fid == NULL){
@@ -870,6 +870,45 @@ void xsol_write_csv(const char *filename, Graph *G, double *x, double *g){
 		fprintf(fid, "%d %d %d %g %g %g %g\n", eij.eid, eij.source, eij.target, eij.capacity, eij.cost_time, x[k], x[k] * g[k]);
 	}
 	fclose(fid);
+}
+char xsol_read_csv(const char *csv_file_name, double *x){
+	FILE *fid = fopen(csv_file_name, "r");
+	if(fid == NULL){
+		printf("The file %s could not be opened.\n", csv_file_name);
+		return 0;
+	}
+
+	char * line = NULL;
+	size_t len = 0, nlines = 0;
+	ssize_t read;
+	double cap, ftt, cost, vol;
+	int eid, source, target;
+	if (fid == NULL) {
+		printf("The file %s could not be opened.\n", csv_file_name);
+		exit(EXIT_FAILURE);
+	}
+
+	// memory allocation (counting the file number of lines)
+	printf("\nReading xsol file: %s\n", csv_file_name);
+	// skipping file header
+	read = getline(&line, &len, fid);
+	nlines = 0;
+	while ((read = getline(&line, &len, fid)) != -1) {
+		if (sscanf(line, "%d %d %d %lf %lf %lf %lf\n", &eid, &source, &target, &cap, &ftt, &vol, &cost) != 7) {
+			printf("   Line[%zu] %s could not be read.\n", nlines + 1, line);
+			exit(EXIT_FAILURE);
+		}
+		x[nlines] = vol;
+		
+		nlines++;
+	}
+
+	fclose(fid);
+	if (line){
+		free(line);
+	}
+	
+	return 1;
 }
 
 // check routines
@@ -972,11 +1011,14 @@ int main(int argc, char **argv) {
 	// int number_of_nodes;
 	// node_read_csv("../instances/dial_nodes.txt", &number_of_nodes, &nodes);
 	// node_print_array(number_of_nodes, nodes);
-
+	
+	char filename[256];
+	
 	// read edges
+	sprintf(filename, "../instances/%s_edges_algbformat.txt", argv[1]);
 	Edge *edges;
-	size_t number_of_edges; 
-	edge_read_csv("../instances/porto_edges_algbformat.txt", &number_of_edges, &edges);
+	size_t number_of_edges;
+	edge_read_csv(filename, &number_of_edges, &edges);
 	edge_print_array(edges, number_of_edges);
 	
 	// create network graph
@@ -991,9 +1033,10 @@ int main(int argc, char **argv) {
 	}
 
 	// read matod edges (travels)
+	sprintf(filename, "../instances/%s_matod.txt", argv[1]);
 	MatODEdge *travels;
 	size_t	number_of_travels;
-	matodedge_read_csv("../instances/porto_matod.txt", &number_of_travels, &travels);
+	matodedge_read_csv(filename, &number_of_travels, &travels);
 	// matodedge_read_csv("matod_sorted.txt", &number_of_travels, &travels);
 	matodedge_print_array(travels, number_of_travels);
 	
@@ -1012,7 +1055,8 @@ int main(int argc, char **argv) {
 	clock_t tic;
 	double *x = (double*) malloc(sizeof(double) * n);
 	tic = clock();
-	shortestpaths(&G, &M, &dijkstra, x);
+	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
+	if(!xsol_read_csv(filename, x)) shortestpaths(&G, &M, &dijkstra, x);	
 	printf("   Elapsed time: %3.2g secs\n", toc(tic));
 	
 	// initial fobj value
@@ -1025,7 +1069,7 @@ int main(int argc, char **argv) {
 	double xtol  = 0.01, fx, fy, dx, dy, df;
     int niter = 0, niter_linesearch;
     char done    = 0;
-    size_t maxit = 100;
+    size_t maxit = 1000;
     clock_t tstart = clock();
 	double *y = (double*) malloc(sizeof(double) * n);
 	double *d = (double*) malloc(sizeof(double) * n);
@@ -1067,7 +1111,8 @@ int main(int argc, char **argv) {
 	}	
     printf("\nTotal elapsed time %.3f hours", toc(tstart) / 3600);
 	
-	xsol_write_csv("xsol.csv", &G, x, g);
+	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
+	xsol_write_csv(filename, &G, x, g);
 	
 	check_opt(&G, &M, &dijkstra, x, &fx, g);
 	
