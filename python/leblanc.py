@@ -47,7 +47,7 @@ class MatOD:
 
 
 def load_data(problem):
-    if problem in {'smallA','smallB','dial'}:
+    if problem in {'smallA','smallB'}:
         fid_nodes = '../instances/' + problem + '_nodes.txt'
         fid_edges = '../instances/' + problem + '_edges.txt'
         fid_matod = '../instances/' + problem + '_od.txt'
@@ -55,11 +55,11 @@ def load_data(problem):
     
     #ToDo: Code to split the porto_R and identify alpha(A), max_distance(D)
     
-    if problem in ['porto', 'lisbon', 'rio', 'boston', 'sfbay']:
+    if problem in ['dial','porto', 'lisbon', 'rio', 'boston', 'sfbay']:
         wdir = "../instances/"
         fid_edges = wdir + '%s_edges_algbformat.txt' % problem
         fid_nodes = wdir + '%s_nodes_algbformat.txt' % problem
-        fid_matod = wdir + '%s_interod_0_1.txt' % problem 
+        fid_matod = wdir + '%s_matod.txt' % problem 
         fid_xsol = None
         # fid_edges = wdir + '%s_selfishflows_0_10.txt' % problem
         # fid_edges = 'sol_porto_0_btwall_01.csv'
