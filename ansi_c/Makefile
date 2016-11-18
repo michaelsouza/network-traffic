@@ -1,3 +1,8 @@
+# REMEMBER TO SET 
+leblanc_openmp.exe: leblanc_openmp.c
+	gcc -Wall -Werror -fopenmp leblanc_openmp.c -lm -o leblanc_openmp
+	./leblanc_openmp.exe
+
 leblanc: leblanc.c
 	gcc -Wall -Werror leblanc.c -lm -o leblanc
 	
