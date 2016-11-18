@@ -1156,6 +1156,7 @@ void task02_integral_seq(){
 	printf("TElapsed %g secs\n", telapsed);
 }
 
+
 void task02_integral_parallel(){
 	// integrates
 	// int_0^1 4.0 / (1+x^2) dx = \pi
@@ -1175,17 +1176,18 @@ void task02_integral_parallel(){
 	#pragma omp parallel
 	{
 		int ID   = omp_get_thread_num();
+		double sum = 0.0;
 		// printf("Thread(%d)\n", ID);
 		int imin = ID * work;
 		int imax = imin + work;
 		// printf("imin: %d, imax: %d\n", imin, imax);
 		int i; 
 		double x;
-		sum_local[ID] = 0.0;
 		for(i = imin; i < imax; i++){
 			x = (i+0.5) * step;
-			sum_local[ID] += 4.0 /(1.0+x*x);
+			sum += 4.0 /(1.0+x*x);
 		}
+		sum_local[ID] = sum;
 	}
 	for(j = 0; j < num_threads; j++){
 		pi += step * sum_local[j];
@@ -1199,4 +1201,6 @@ void task02_integral_parallel(){
 int main(int argc, char **argv){
 	task02_integral_seq();
 	task02_integral_parallel();
+	
+	return EXIT_SUCCESS;
 }
