@@ -4,7 +4,7 @@ leblanc_openmp: leblanc_openmp.c
 
 leblanc_openmp_valgrind: leblanc_openmp.c
 	gcc -pg -Wall -Werror leblanc_openmp.c -lm -o leblanc_openmp_valgrind
-	valgrind --tool=memcheck --leak-check=yes  --show-reachable=yes ./leblanc_openmp_valgrind sample
+	valgrind --tool=memcheck --leak-check=yes --track-origins=yes --show-reachable=yes ./leblanc_openmp_valgrind sample
 
 
 leblanc: leblanc.c
