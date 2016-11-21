@@ -16,7 +16,7 @@
 #define toc(x) (omp_get_wtime() - x)
 
 // Node
-typedef struct {
+typedef struct Node{
 	int nid;
 	double lon;
 	double lat;
@@ -831,7 +831,6 @@ int bpr_linesearch(const Graph *G, const double *x, const double *d, double *y, 
 
 // shortestpaths
 void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
-	double tic = omp_get_wtime();
 	#pragma omp parallel
 	{
 		Edge *edge;
@@ -841,7 +840,6 @@ void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
 		double vol, *x_local;
 		tid = omp_get_thread_num();
 		num_threads = omp_get_num_threads();
-		printf("\ntid: %d num_threads: %d\n", tid, num_threads);
 
 		x_local = (double*)malloc(sizeof(double) * G->number_of_edges);
 		if(x_local == NULL){
@@ -885,7 +883,6 @@ void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
 
 		free(x_local);
 	}
-	printf("TElapsed %3.2f seconds\n", toc(tic));
 }
 
 // xsol file
@@ -1040,12 +1037,6 @@ void check_opt(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x, double *f, dou
 }
 
 int leblanc_apply(int argc, char **argv) {
-	// read nodes
-	// Node *nodes;
-	// int number_of_nodes;
-	// node_read_csv("../instances/dial_nodes.txt", &number_of_nodes, &nodes);
-	// node_print_array(number_of_nodes, nodes);
-	
 	char filename[256];
 	int num_threads = 3;
 	omp_set_num_threads(num_threads);
@@ -1091,7 +1082,7 @@ int leblanc_apply(int argc, char **argv) {
 
 	// set initial x
 	printf("Set initial x\n");
-	clock_t tic;
+	double tic;
 	double *x = (double*) malloc(sizeof(double) * n);
 	tic = omp_get_wtime();
 	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
@@ -1111,7 +1102,7 @@ int leblanc_apply(int argc, char **argv) {
     int niter = 0, niter_linesearch;
     char done = 0;
     size_t maxit = 1000;
-    clock_t tstart = clock();
+    double tstart = omp_get_wtime();
 	double *y = (double*) malloc(sizeof(double) * n);
 	double *d = (double*) malloc(sizeof(double) * n);
     while(!done){
@@ -1151,8 +1142,6 @@ int leblanc_apply(int argc, char **argv) {
             printf("-------------------------------------------------------------------------------------------\n");
 		}
 		printf(" %5d       %5.3E     %5.3E   %5.3E    %5d         %6.3f   %9.3f\n", niter, dx, fy, df, niter_linesearch, tDijks, toc(tic));
-
-		exit(EXIT_FAILURE);
 	}	
     printf("\nTotal elapsed time %.3f hours\n", toc(tstart) / 3600);
 	
@@ -1161,9 +1150,18 @@ int leblanc_apply(int argc, char **argv) {
 	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
 	xsol_write_csv(filename, &G, x, g);
 	
-	free(nodes);
+	// memory release
 	free(edges);
-	free(matod);
+	free(travels);
+	free(x);
+	free(g);
+	free(y);
+	free(d);
+	for(k = 0; k < num_threads; k++){
+		dijkstra_free(&(dijkstra[k]));
+	}
+	free(dijkstra);
+	graph_free(&G);
 	
 	return EXIT_SUCCESS;
 }
