@@ -13,7 +13,7 @@
 #include <time.h>
 #include <omp.h>
 
-#define toc(x) ((double)(clock() - (x))/CLOCKS_PER_SEC)
+#define toc(x) (omp_get_wtime() - x)
 
 // Node
 typedef struct {
@@ -428,10 +428,10 @@ void dijkstra_print_status(Dijkstra *dijkstra){
 
 void dijkstra_apply(Dijkstra *dijkstra, Graph *G, int s){
 	double *dist = dijkstra->dist;
-	int   *pred = dijkstra->pred;
-	char  *done = dijkstra->done;
-	Heap  *heap = &(dijkstra->heap);
-	Edge  *edges;
+	int    *pred = dijkstra->pred;
+	char   *done = dijkstra->done;
+	Heap   *heap = &(dijkstra->heap);
+	Edge   *edges;
 	
 	double dist_sv, dist_svu;
 	int   i, v, u;
@@ -883,7 +883,7 @@ void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
 			}
 		}
 	}
-	printf("TElapsed %3.2f seconds\n", omp_get_wtime() - tic);
+	printf("TElapsed %3.2f seconds\n", toc(tic));
 }
 
 // xsol file
@@ -1045,7 +1045,7 @@ int leblanc_apply(int argc, char **argv) {
 	// node_print_array(number_of_nodes, nodes);
 	
 	char filename[256];
-	int num_threads = 1;
+	int num_threads = 3;
 	omp_set_num_threads(num_threads);
 
 	// read edges
@@ -1091,7 +1091,7 @@ int leblanc_apply(int argc, char **argv) {
 	printf("Set initial x\n");
 	clock_t tic;
 	double *x = (double*) malloc(sizeof(double) * n);
-	tic = clock();
+	tic = omp_get_wtime();
 	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
 	if(!xsol_read_csv(filename, x)) {
 		shortestpaths(&G, &M, dijkstra, x);	
@@ -1101,11 +1101,11 @@ int leblanc_apply(int argc, char **argv) {
 	// initial fobj value
 	double *g = (double *) malloc(sizeof(double*) * n);
 	double f;
-	tic = clock();
+	tic = omp_get_wtime();
 	bpr(&G, x, &f, g);
 	printf("fobj(x_start) = %.8E calculated in %3.2f seconds", f, toc(tic));
 	
-	double xtol = 0.01, fx, fy, dx, dy, df;
+	double xtol = 0.01, fx, fy, dx, dy, df, tDijks;
     int niter = 0, niter_linesearch;
     char done = 0;
     size_t maxit = 1000;
@@ -1113,7 +1113,7 @@ int leblanc_apply(int argc, char **argv) {
 	double *y = (double*) malloc(sizeof(double) * n);
 	double *d = (double*) malloc(sizeof(double) * n);
     while(!done){
-        tic = clock();
+		tic = omp_get_wtime();
 		
         // update cost
         bpr(&G, x, &fx, g);
@@ -1122,7 +1122,9 @@ int leblanc_apply(int argc, char **argv) {
 		}
 		
         // update direction
+		tDijks = omp_get_wtime();
         shortestpaths(&G,&M,dijkstra,d);
+		tDijks = toc(tDijks);
         vecadd(d,x,-1.0,n);
 		
         // solve line search problem bpr(ftt, cap, x + a * d)
@@ -1143,10 +1145,10 @@ int leblanc_apply(int argc, char **argv) {
         veccpy(x,y,n);
        
         if(niter % 20 == 1){
-            printf("\n  niter_out     dx            fobj           df        niter_in   itime(sec)\n");
-            printf("---------------------------------------------------------------------\n");
+            printf("\n  niter_out     dx            fobj           df        niter_in   tDijks(s)  tIter(s)\n");
+            printf("-------------------------------------------------------------------------------------------\n");
 		}
-		printf(" %5d       %5.3E     %5.3E   %5.3E    %5d         %.3f\n", niter, dx, fy, df, niter_linesearch, toc(tic));
+		printf(" %5d       %5.3E     %5.3E   %5.3E    %5d         %6.3f   %9.3f\n", niter, dx, fy, df, niter_linesearch, tDijks, toc(tic));
 
 		exit(EXIT_FAILURE);
 	}	
