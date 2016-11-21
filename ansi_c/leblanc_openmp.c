@@ -1109,51 +1109,51 @@ int leblanc_apply(int argc, char **argv) {
 	printf("fobj(x_start) = %.8E calculated in %3.2f seconds", f, toc(tic));
 	
 	double xtol = 0.01, fx, fy, dx, dy, df, tDijks;
-    int niter = 0, niter_linesearch;
-    char done = 0;
-    size_t maxit = 1000;
-    double tstart = omp_get_wtime();
+	int niter = 0, niter_linesearch;
+   	char done = 0;
+   	size_t maxit = 1000;
+   	double tstart = omp_get_wtime();
 	double *y = (double*) malloc(sizeof(double) * n);
 	double *d = (double*) malloc(sizeof(double) * n);
-    while(!done){
+	while(!done){
 		tic = omp_get_wtime();
 		
-        // update cost
-        bpr(&G, x, &fx, g);
-        for(k=0;k<n;k++){
-            G.eij[k].weight=g[k];
+        	// update cost
+		bpr(&G, x, &fx, g);
+        	for(k=0;k<n;k++){
+			G.eij[k].weight=g[k];
 		}
 		
-        // update direction
+        	// update direction
 		tDijks = omp_get_wtime();
-        shortestpaths(&G,&M,dijkstra,d);
+		shortestpaths(&G,&M,dijkstra,d);
 		tDijks = toc(tDijks);
-        vecadd(d,x,-1.0,n);
+		vecadd(d,x,-1.0,n);
 		
-        // solve line search problem bpr(ftt, cap, x + a * d)
+        	// solve line search problem bpr(ftt, cap, x + a * d)
 		niter_linesearch = bpr_linesearch(&G, x, d, y, &fy, g);
 		
-        // stop criterion
-        // dx = np.max(np.abs(x-y)/(np.abs(x)+1))
+        	// stop criterion
+		// dx = np.max(np.abs(x-y)/(np.abs(x)+1))
 		dx = 0.0;
 		for(k=0;k<n;k++){
 			dy = fabs(x[k]-y[k]) / (fabs(x[k]) + 1);
 			if(dx < dy) dx = dy;
 		}
-        df = (fx - fy) / fx;
-        niter++;
-        done = dx < xtol || niter > maxit || df < 1E-4;
+		df = (fx - fy) / fx;
+        	niter++;
+        	done = dx < xtol || niter > maxit || df < 1E-4;
 
-        // update x
-        veccpy(x,y,n);
+        	// update x
+        	veccpy(x,y,n);
        
-        if(niter % 20 == 1){
-            printf("\n  niter_out     dx            fobj           df        niter_in   tDijks(s)  tIter(s)\n");
-            printf("-------------------------------------------------------------------------------------------\n");
+        	if(niter % 20 == 1){
+            		printf("\n  niter_out     dx            fobj           df        niter_in   tDijks(s)  tIter(s)\n");
+            		printf("-------------------------------------------------------------------------------------------\n");
 		}
 		printf(" %5d       %5.3E     %5.3E   %5.3E    %5d         %6.3f   %9.3f\n", niter, dx, fy, df, niter_linesearch, tDijks, toc(tic));
 	}	
-    printf("\nTotal elapsed time %.3f hours\n", toc(tstart) / 3600);
+	printf("\nTotal elapsed time %.3f hours\n", toc(tstart) / 3600);
 	
 	check_opt(&G, &M, dijkstra, x, &fx, g);
 	
