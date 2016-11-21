@@ -559,7 +559,7 @@ void matodedge_sort_by_source_target_indices(MatODEdge *edge, size_t number_of_e
 		k = i;
 		swap = edge[i];
 		if(i % 100 == 0){
-			printf("\r      Completed %5.2f%%", (100.0 * i) / number_of_edges);
+			printf("\r      Completed %6.2f%%", (100.0 * i) / number_of_edges);
 			fflush(stdout);
 		}
 		for(j = i - 1; j >= 0; j--){
@@ -574,7 +574,7 @@ void matodedge_sort_by_source_target_indices(MatODEdge *edge, size_t number_of_e
 		}
 		edge[k] = swap;
 	}
-	printf("\n");
+	printf("\r      Completed %6.2f%%\n", 100.0);
 	if(is_ok == 0){
 		matodedge_write_csv("matod_sorted.txt", edge, number_of_edges);
 	}
@@ -831,31 +831,59 @@ int bpr_linesearch(const Graph *G, const double *x, const double *d, double *y, 
 
 // shortestpaths
 void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
-    int i, j, source, target, pred;
-	double vol;
-	
-	// set x = zeros
-	for(i = 0; i < G->number_of_edges; i++){
-		x[i] = 0.0;
-	}
-	Edge *edge;
-	MatODEdge *travel;
-	size_t ntravel;
-	for(i = 0; i < M->number_of_sources; i++){
-		source = M->sources[i];
-		dijkstra_apply(dijkstra, G, source);
-		matod_vertex_edges(M, source, &travel, &ntravel);
-		for(j = 0; j < ntravel; j++){
-			vol    = travel[j].vol;
-			target = travel[j].target;
-			while(target != source){
-				pred = dijkstra->pred[target];
-				edge = graph_edge(G, pred, target);
-				x[edge->xid] += vol;
-				target = pred;
+	double tic = omp_get_wtime();
+	#pragma omp parallel
+	{
+		Edge *edge;
+		MatODEdge *travel;
+		size_t ntravel;
+		int i, j, source, target, pred, tid, num_threads;
+		double vol, *x_local;
+		tid = omp_get_thread_num();
+		num_threads = omp_get_num_threads();
+		printf("\ntid: %d num_threads: %d\n", tid, num_threads);
+
+		x_local = (double*)malloc(sizeof(double) * G->number_of_edges);
+		if(x_local == NULL){
+			printf("The vector x_local could not be allocated.\n");
+			exit(EXIT_FAILURE);
+		}
+
+		// set x_local = zeros
+		for(i = 0; i < G->number_of_edges; i++){
+			x_local[i] = 0.0;
+		}
+
+		// set x = zeros (using spmd parallel pattern)
+		for(i = tid; i < G->number_of_edges; i+=num_threads){
+			x[i] = 0.0;
+		}
+
+		for(i = tid; i < M->number_of_sources; i+=num_threads){
+			source = M->sources[i];
+			dijkstra_apply(&(dijkstra[tid]), G, source);
+			matod_vertex_edges(M, source, &travel, &ntravel);
+			for(j = 0; j < ntravel; j++){
+				vol    = travel[j].vol;
+				target = travel[j].target;
+				while(target != source){
+					pred = dijkstra[tid].pred[target];
+					edge = graph_edge(G, pred, target);
+					x_local[edge->xid] += vol;
+					target = pred;
+				}
+			}
+		}
+
+		// update x
+		#pragma omp critical
+		{
+			for(i = 0; i < G->number_of_edges; i++){
+				x[i] += x_local[i];
 			}
 		}
 	}
+	printf("TElapsed %3.2f seconds\n", omp_get_wtime() - tic);
 }
 
 // xsol file
@@ -865,7 +893,7 @@ void xsol_write_csv(const char *filename, Graph *G, double *x, double *g){
 		printf("The file %s could not be opened.\n", filename);
 		exit(EXIT_FAILURE);
 	}
-	
+	printf("Saving file %s\n", filename);
 	fprintf(fid, "eid source target cap ftt vol cost\n");
 	int k;
 	Edge eij;
@@ -1017,7 +1045,9 @@ int leblanc_apply(int argc, char **argv) {
 	// node_print_array(number_of_nodes, nodes);
 	
 	char filename[256];
-	
+	int num_threads = 1;
+	omp_set_num_threads(num_threads);
+
 	// read edges
 	sprintf(filename, "../instances/%s_edges_algbformat.txt", argv[1]);
 	Edge *edges;
@@ -1048,19 +1078,24 @@ int leblanc_apply(int argc, char **argv) {
 	MatOD M;
 	matod_init(&M, travels, number_of_travels);
 	matod_print(&M);
-	matod_clean(&M, &G);
+	// matod_clean(&M, &G);
 	
 	// create Dijkstra
-	Dijkstra dijkstra;
-	dijkstra_init(&dijkstra, &G);
-	
+	Dijkstra *dijkstra = (Dijkstra*)malloc(sizeof(Dijkstra) * num_threads);
+	for(k = 0; k < num_threads; k++)
+	{
+		dijkstra_init(&(dijkstra[k]), &G);
+	}
+
 	// set initial x
 	printf("Set initial x\n");
 	clock_t tic;
 	double *x = (double*) malloc(sizeof(double) * n);
 	tic = clock();
 	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
-	if(!xsol_read_csv(filename, x)) shortestpaths(&G, &M, &dijkstra, x);	
+	if(!xsol_read_csv(filename, x)) {
+		shortestpaths(&G, &M, dijkstra, x);	
+	}
 	printf("   Elapsed time: %3.2g secs\n", toc(tic));
 	
 	// initial fobj value
@@ -1070,9 +1105,9 @@ int leblanc_apply(int argc, char **argv) {
 	bpr(&G, x, &f, g);
 	printf("fobj(x_start) = %.8E calculated in %3.2f seconds", f, toc(tic));
 	
-	double xtol  = 0.01, fx, fy, dx, dy, df;
+	double xtol = 0.01, fx, fy, dx, dy, df;
     int niter = 0, niter_linesearch;
-    char done    = 0;
+    char done = 0;
     size_t maxit = 1000;
     clock_t tstart = clock();
 	double *y = (double*) malloc(sizeof(double) * n);
@@ -1087,7 +1122,7 @@ int leblanc_apply(int argc, char **argv) {
 		}
 		
         // update direction
-        shortestpaths(&G,&M,&dijkstra,d);
+        shortestpaths(&G,&M,dijkstra,d);
         vecadd(d,x,-1.0,n);
 		
         // solve line search problem bpr(ftt, cap, x + a * d)
@@ -1112,18 +1147,19 @@ int leblanc_apply(int argc, char **argv) {
             printf("---------------------------------------------------------------------\n");
 		}
 		printf(" %5d       %5.3E     %5.3E   %5.3E    %5d         %.3f\n", niter, dx, fy, df, niter_linesearch, toc(tic));
+
+		exit(EXIT_FAILURE);
 	}	
-    printf("\nTotal elapsed time %.3f hours", toc(tstart) / 3600);
+    printf("\nTotal elapsed time %.3f hours\n", toc(tstart) / 3600);
+	
+	check_opt(&G, &M, dijkstra, x, &fx, g);
 	
 	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
 	xsol_write_csv(filename, &G, x, g);
 	
-	check_opt(&G, &M, &dijkstra, x, &fx, g);
-	
 	// free(nodes);
 	// free(edges);
 	// free(matod);
-	
 	// check_dijkstra();
 	// matod_clean();
 	
@@ -1197,7 +1233,7 @@ void task02_integral_parallel(int num_threads){
 	printf("pi: %f NumProc: %d TElapsed: %3.2gs\n", pi, num_threads, telapsed);
 }
 
-void task03_integrap_parallel_optimized(int num_threads){
+void task03_integral_parallel_optimized(int num_threads){
 	// integrates
 	// int_0^1 4.0 / (1+x^2) dx = \pi
 	static long num_steps = 1000000000;
@@ -1227,11 +1263,12 @@ void task03_integrap_parallel_optimized(int num_threads){
 }
 
 int main(int argc, char **argv){
-	task02_integral_seq();
-	int num_threads;
-	for(num_threads=1;num_threads<8;num_threads++){
-		task03_integrap_parallel_optimized(num_threads);
-	}
+	// task02_integral_seq();
+	// int num_threads;
+	// for(num_threads=1;num_threads<8;num_threads++){
+	// 	task03_integral_parallel_optimized(num_threads);
+	// }
+	leblanc_apply(argc, argv);
 	
 	return EXIT_SUCCESS;
 }
