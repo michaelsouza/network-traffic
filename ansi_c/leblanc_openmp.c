@@ -1001,7 +1001,7 @@ void check_opt(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x, double *f, dou
     int j, k, s;
 	
 	printf("\nOptimality analysis: \n");
-    clock_t tic = clock();
+    double tic = omp_get_wtime();
 	
     // update cost
     bpr(G, x, f, g);
@@ -1038,7 +1038,7 @@ void check_opt(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x, double *f, dou
 
 int leblanc_apply(int argc, char **argv) {
 	char filename[256];
-	int num_threads = 3;
+	int num_threads = 120;
 	omp_set_num_threads(num_threads);
 
 	// read edges
