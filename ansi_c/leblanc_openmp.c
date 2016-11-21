@@ -2,7 +2,8 @@
  * leblanc.c
  *
  *  Created on: Nov 9, 2016
- *      Author: michael
+ *      Author: Michael Souza
+ *      E-mail: souza.michael@gmail.com
  */
 
 #include <stdio.h>
@@ -824,6 +825,8 @@ int bpr_linesearch(const Graph *G, const double *x, const double *d, double *y, 
 			return -3;
 		}
     }
+
+    return 0;
 }
 
 // shortestpaths
@@ -1155,15 +1158,12 @@ void task02_integral_seq(){
 	printf("pi = %f\n", pi);
 	printf("TElapsed %g secs\n", telapsed);
 }
-
-
-void task02_integral_parallel(){
+void task02_integral_parallel(int num_threads){
 	// integrates
 	// int_0^1 4.0 / (1+x^2) dx = \pi
 	static long num_steps = 1000000000;
 	double step = 1.0 / (double) num_steps;
 	
-	int num_threads = 4;
 	omp_set_dynamic(0);
 	omp_set_num_threads(num_threads);
 	int work = num_steps / num_threads;
@@ -1194,13 +1194,44 @@ void task02_integral_parallel(){
 	}
 	double telapsed = omp_get_wtime() - tic;
 	
-	printf("pi = %f\n", pi);
-	printf("TElapsed %g secs\n", telapsed);
+	printf("pi: %f NumProc: %d TElapsed: %3.2gs\n", pi, num_threads, telapsed);
+}
+
+void task03_integrap_parallel_optimized(int num_threads){
+	// integrates
+	// int_0^1 4.0 / (1+x^2) dx = \pi
+	static long num_steps = 1000000000;
+	double step = 1.0 / (double) num_steps;
+
+	omp_set_num_threads(num_threads);
+	double pi=0.0;
+	double tic = omp_get_wtime();
+	#pragma omp parallel
+	{
+		int i, id = omp_get_thread_num(), slice = omp_get_num_threads();
+		double x, sum_local = 0.0;
+		if(id == 0){
+			num_threads = slice;
+		}
+		for(i = id; i < num_steps; i+=slice){
+			x = (i+0.5) * step;
+			sum_local += 4.0 /(1.0+x*x);
+		}
+		#pragma omp atomic
+		pi += step * sum_local;
+	}
+
+	double telapsed = omp_get_wtime() - tic;
+
+	printf("pi: %f NumProc: %d TElapsed: %3.2gs\n", pi, num_threads, telapsed);
 }
 
 int main(int argc, char **argv){
 	task02_integral_seq();
-	task02_integral_parallel();
+	int num_threads;
+	for(num_threads=1;num_threads<8;num_threads++){
+		task03_integrap_parallel_optimized(num_threads);
+	}
 	
 	return EXIT_SUCCESS;
 }
