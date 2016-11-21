@@ -80,7 +80,7 @@ void node_print_array(int number_of_nodes, Node *nodes) {
 }
 
 // Edge
-typedef struct {
+typedef struct Edge {
 	int eid;
 	int source;
 	int target;
@@ -180,7 +180,7 @@ void edge_sort_by_source_target_indices(Edge *edge, size_t number_of_edges){
 }
 
 // Heap
-typedef struct{
+typedef struct Heap{
 	int   *nid; // array of nodes' ids
 	double *cost;
 	size_t len;
@@ -272,7 +272,7 @@ void heap_free(Heap *heap){
 }
 
 // Graph (using CSR)
-typedef struct{
+typedef struct Graph{
 	size_t number_of_nodes;
 	size_t number_of_edges;
 	int *i;    // accessed using one-based index scheme
@@ -373,7 +373,7 @@ Edge* graph_edge(Graph *G, int i, int j){
 }
 
 // Dijkstra
-typedef struct{
+typedef struct Dijkstra{ 
 	int number_of_nodes;
 	double *dist;
 	int   *pred;
@@ -467,7 +467,7 @@ void dijkstra_apply(Dijkstra *dijkstra, Graph *G, int s){
 }
 
 // MatODEdge
-typedef struct {
+typedef struct MatODEdge {
 	int source;
 	int target;
 	double vol;
@@ -581,7 +581,7 @@ void matodedge_sort_by_source_target_indices(MatODEdge *edge, size_t number_of_e
 }
 
 // MatOD (CSR)
-typedef struct{
+typedef struct MatOD{
 	size_t number_of_nodes;
 	size_t number_of_edges;
 	size_t number_of_sources;
@@ -637,6 +637,12 @@ void matod_init(MatOD *G, MatODEdge *edges, size_t number_of_edges){
 		}
 	}
 	G->number_of_sources = i;
+}
+
+void matod_free(MatOD *G){
+	free(G->sources);
+	free(G->i);
+	free(G->j);
 }
 
 void matod_print(MatOD *G){
@@ -1172,6 +1178,7 @@ int leblanc_apply(int argc, char **argv) {
 	}
 	free(dijkstra);
 	graph_free(&G);
+	matod_free(&M);
 	
 	return EXIT_SUCCESS;
 }
