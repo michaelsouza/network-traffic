@@ -998,7 +998,7 @@ int check_dijkstra(){
 }
 
 void check_opt(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x, double *f, double *g){
-    int j, k, s;
+    int k;
 	
 	printf("\nOptimality analysis: \n");
     double tic = omp_get_wtime();
@@ -1010,16 +1010,26 @@ void check_opt(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x, double *f, dou
 	}
 
     // cost per path
-	MatODEdge *travels;
-	size_t ntravels;
     double cost_per_path = 0.0;
-    for(k = 0; k < M->number_of_sources; k++){
-		s = M->sources[k];
-        dijkstra_apply(dijkstra, G, s);
-        matod_vertex_edges(M, s, &travels, &ntravels);
-		for(j = 0; j < ntravels; j++){
-            cost_per_path += dijkstra->dist[travels[j].target] * travels[j].vol;
+    #pragma omp parallel
+    {
+		MatODEdge *travels;
+		size_t ntravels;
+		double cost_per_path_local = 0.0;
+		int j, k, s;
+		int tid = omp_get_thread_num();
+		int num_threads = omp_get_num_threads();
+		for(k = tid; k < M->number_of_sources; k+=num_threads){
+			s = M->sources[k];
+			dijkstra_apply(&(dijkstra[tid]), G, s);
+			matod_vertex_edges(M, s, &travels, &ntravels);
+			for(j = 0; j < ntravels; j++){
+				cost_per_path_local += dijkstra[tid].dist[travels[j].target] * travels[j].vol;
+			}
 		}
+		
+		#pragma omp atomic
+		cost_per_path += cost_per_path_local;
 	}
 	
     // cost per edge
