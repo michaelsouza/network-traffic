@@ -882,6 +882,8 @@ void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
 				x[i] += x_local[i];
 			}
 		}
+
+		free(x_local);
 	}
 	printf("TElapsed %3.2f seconds\n", toc(tic));
 }
@@ -1159,11 +1161,9 @@ int leblanc_apply(int argc, char **argv) {
 	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
 	xsol_write_csv(filename, &G, x, g);
 	
-	// free(nodes);
-	// free(edges);
-	// free(matod);
-	// check_dijkstra();
-	// matod_clean();
+	free(nodes);
+	free(edges);
+	free(matod);
 	
 	return EXIT_SUCCESS;
 }
