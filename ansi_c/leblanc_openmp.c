@@ -842,10 +842,10 @@ void shortestpaths(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x){
 		Edge *edge;
 		MatODEdge *travel;
 		size_t ntravel;
-		int i, j, source, target, pred, tid, num_threads;
+		int i, j, source, target, pred;
 		double vol, *x_local;
-		tid = omp_get_thread_num();
-		num_threads = omp_get_num_threads();
+		int tid = omp_get_thread_num();
+		int num_threads = omp_get_num_threads();
 
 		x_local = (double*)malloc(sizeof(double) * G->number_of_edges);
 		if(x_local == NULL){
@@ -1089,7 +1089,7 @@ int leblanc_apply(int argc, char **argv) {
 	matod_print(&M);
 	// matod_clean(&M, &G);
 	
-	// create Dijkstra
+	// create Dijkstra structures
 	Dijkstra *dijkstra = (Dijkstra*)malloc(sizeof(Dijkstra) * num_threads);
 	for(k = 0; k < num_threads; k++)
 	{
