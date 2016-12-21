@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 
-problem  = 'porto'
+problem = 'porto'
 MAX_DIST = {50, 100, 250, 500}
-ALPHA    = {0.1, 0.2, 0.5, 0.7, 1.0}
-RANK     = {'btw_id', 'voc_id'}
+ALPHA = {0.1, 0.2, 0.5, 0.7, 1.0}
+RANK = {'btw_id', 'voc_id'}
 
 for alpha in ALPHA:
     for max_dist in MAX_DIST:
