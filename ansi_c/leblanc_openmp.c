@@ -86,8 +86,9 @@ typedef struct Edge {
 	int target;
 	int dir;
 	double capacity;
-	double speed_mph;
-	double cost_time;
+	double speed_kmh;
+	double length_km;
+	double cost_time_hour;
 	double weight;
 	double vol;
 	int xid;
@@ -98,7 +99,7 @@ void edge_read_csv(char *csv_file_name, size_t *number_of_edges, Edge **edges) {
 	size_t len = 0, nlines = 0;
 	ssize_t read;
 	FILE *fid = fopen(csv_file_name, "r");
-	double capacity, speed_mph, cost_time;
+	double capacity, speed_kmh, length_km, cost_time_hour;
 	int eid, source, target, dir;
 
 	if (fid == NULL) {
@@ -119,8 +120,8 @@ void edge_read_csv(char *csv_file_name, size_t *number_of_edges, Edge **edges) {
 	read = getline(&line, &len, fid);
 	nlines = 0;
 	while ((read = getline(&line, &len, fid)) != -1) {
-		if (sscanf(line, "%d %d %d %d %lf %lf %lf\n", &eid, &source, &target, &dir, 
-			&capacity, &speed_mph, &cost_time) != 7) {
+		if (sscanf(line, "%d %d %d %d %lf %lf %lf %lf\n", &eid, &source, &target, &dir,
+			&capacity, &speed_kmh, &length_km, &cost_time_hour) != 8) {
 			printf("   Line[%zu] %s could not be read.\n", nlines + 1, line);
 			exit(EXIT_FAILURE);
 		}
@@ -129,8 +130,9 @@ void edge_read_csv(char *csv_file_name, size_t *number_of_edges, Edge **edges) {
 		(*edges)[nlines].target    = target;
 		(*edges)[nlines].dir       = dir;
 		(*edges)[nlines].capacity  = capacity;
-		(*edges)[nlines].speed_mph = speed_mph;
-		(*edges)[nlines].cost_time = cost_time;
+		(*edges)[nlines].speed_kmh = speed_kmh;
+		(*edges)[nlines].length_km = length_km;
+		(*edges)[nlines].cost_time_hour = cost_time_hour;
 		(*edges)[nlines].vol       = 0.0;
 		nlines++;
 	}
@@ -149,13 +151,13 @@ void edge_print_array(Edge *edges, size_t number_of_edges) {
 	for (i = 0; i < 5; i++) {
 		printf("[Line %05d] % 8d % 8d % 8d %9.2g %9.2g\n", i + 2, edges[i].eid,
 				edges[i].source, edges[i].target, edges[i].capacity,
-				edges[i].cost_time);
+				edges[i].cost_time_hour);
 	}
 	printf("[..........]   ...  ....  ....\n");
 	for (i = number_of_edges - 5; i < number_of_edges; i++) {
 		printf("[Line %05d] % 8d % 8d % 8d %9.2g %9.2g\n", i + 2, edges[i].eid,
 				edges[i].source, edges[i].target, edges[i].capacity,
-				edges[i].cost_time);
+				edges[i].cost_time_hour);
 	}
 }
 
@@ -334,13 +336,13 @@ void graph_print(Graph *G){
 	for (i = 0; i < 5; i++) {
 		printf("  % 5d % 6d % 8d %9.2f %7.2f\n", edges[i].eid,
 				edges[i].source, edges[i].target, edges[i].capacity,
-				edges[i].cost_time);
+				edges[i].cost_time_hour);
 	}
 	printf("     ...  ....  ....\n");
 	for (i = G->number_of_edges - 5; i < G->number_of_edges; i++) {
 		printf("  % 5d % 6d % 8d %9.2f %7.2f\n", edges[i].eid,
 				edges[i].source, edges[i].target, edges[i].capacity,
-				edges[i].cost_time);
+				edges[i].cost_time_hour);
 	}
 }
 
@@ -778,8 +780,8 @@ void bpr(const Graph *G, const double *x, double *f, double *g){
 	*f = 0.0;
 	for(i = 0; i < G->number_of_edges; i++){
 		y   = pow(x[i] / edge[i].capacity, 4.0);
-		*f += (edge[i].cost_time * x[i]) * (1.0 + 0.03 * y);
-		g[i] = edge[i].cost_time * (1.0 + 0.15 * y);
+		*f += (edge[i].cost_time_hour * x[i]) * (1.0 + 0.03 * y);
+		g[i] = edge[i].cost_time_hour * (1.0 + 0.15 * y);
 	}
 }
 
@@ -904,7 +906,7 @@ void xsol_write_csv(const char *filename, Graph *G, double *x, double *g){
 	Edge eij;
 	for(k = 0; k < G->number_of_edges; k++){
 		eij = G->eij[k];
-		fprintf(fid, "%d %d %d %g %g %g %g\n", eij.eid, eij.source, eij.target, eij.capacity, eij.cost_time, x[k], x[k] * g[k]);
+		fprintf(fid, "%d %d %d %g %g %g %g\n", eij.eid, eij.source, eij.target, eij.capacity, eij.cost_time_hour, x[k], x[k] * g[k]);
 	}
 	fclose(fid);
 }
@@ -989,7 +991,7 @@ int check_dijkstra(){
 	graph_init(&G, edges, number_of_edges);
 	graph_print(&G);
 	for(k = 0; k < G.number_of_edges; k++){
-		G.eij[k].weight = G.eij[k].cost_time;
+		G.eij[k].weight = G.eij[k].cost_time_hour;
 	}
 	
 	Dijkstra dijkstra;
@@ -1054,11 +1056,11 @@ void check_opt(Graph *G, MatOD *M, Dijkstra *dijkstra, double *x, double *f, dou
 
 int leblanc_apply(int argc, char **argv) {
 	char filename[256];
-	int num_threads = 1;
+	int num_threads = omp_get_max_threads();
 	omp_set_num_threads(num_threads);
 
 	// read edges
-	sprintf(filename, "../instances/%s_edges_algbformat.txt", argv[1]);
+	sprintf(filename, "../instances/%s_edges.csv", argv[1]);
 	Edge *edges;
 	size_t number_of_edges;
 	edge_read_csv(filename, &number_of_edges, &edges);
@@ -1072,7 +1074,7 @@ int leblanc_apply(int argc, char **argv) {
 	// set init edge weight
 	int k;
 	for(k = 0; k < n; k++){
-		G.eij[k].weight = G.eij[k].cost_time;
+		G.eij[k].weight = G.eij[k].cost_time_hour;
 	}
 
 	// read matod edges (travels)

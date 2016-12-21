@@ -1,22 +1,21 @@
 import pandas as pd
 import numpy as np
 
-problem = 'porto'
+problem  = 'porto'
 MAX_DIST = {50, 100, 250, 500}
-ALPHA = {0.1, 0.2, 0.5, 0.7, 1.0}
-RANK = {'btw_id', 'voc_id'}
+ALPHA    = {0.1, 0.2, 0.5, 0.7, 1.0}
+RANK     = {'btw_id', 'voc_id'}
 
 for alpha in ALPHA:
     for max_dist in MAX_DIST:
         for rank in RANK:
-            if problem == 'porto':
-                fid_tab = 'table_porto_0_10.csv'
+            fid_tab = '../matlab/rank_table_%s.csv' % problem
                 
             # load table of ranks
-            print('Reading table of ranks')
+            print('Reading table of ranks: %s' % fid_tab)
             table = pd.read_csv(fid_tab)
 
-            table_gid = table['gid'].as_matrix()
+            table_gid = table['eid'].as_matrix()
             table_dij = table['dij_km'].as_matrix()
             table_rank_id = table[rank].as_matrix()
 
@@ -36,7 +35,7 @@ for alpha in ALPHA:
                 if gid >= 0:
                     total_dist += table_dij[eid]
                 else:
-                    print('Edge %d was not added' % gid)
+                    print('The length of edge %d was not added' % gid)
                 
                 # stop criteria
                 if total_dist >= max_dist:
