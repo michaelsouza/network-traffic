@@ -8,29 +8,11 @@ for j = 1:length(CITY)
     
     %% read original traffic assignment table
     fprintf('Reading original data: %s\n', upper(city));
-    table = readtable(['../instances/' city '_edges_algbformat.txt'], 'Delimiter', ' ');
+    table = readtable(['../instances/' city '_edges.csv'], 'Delimiter', ' ');
     nedges = length(table.source);
     index = (1:nedges)';
     map_eid = sparse(table.source, table.target, index);
-    
-    %% DIST
-    fprintf('Creating DIJ_KM column\n');
-    nodes = readtable(['../instances/' city '_nodes_algbformat.txt'], 'Delimiter', ' ');
-    dij_km = zeros(size(index));
-    nnodes = max([table.source;table.target;nodes.nid]);
-    lon = nan(nnodes, 1);
-    lat = nan(nnodes, 1);
-    for k = 1:length(nodes.lon)
-        lon(nodes.nid(k)) = nodes.lon(k);
-        lat(nodes.nid(k)) = nodes.lat(k);
-    end
-    for k = 1:nedges
-        s = table.source(k);
-        t = table.target(k);
-        dij_km(k) = distance_from_coords(lon(s), lat(s), lon(t), lat(t));
-    end
-    table.dij_km = dij_km;
-    
+        
     %% VOC
     fprintf('Creating VOC rank\n');
     table_voc = readtable(['../instances/' city '_xsol.txt'], 'Delimiter', ' ');
