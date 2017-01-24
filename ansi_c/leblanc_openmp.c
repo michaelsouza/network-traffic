@@ -1102,21 +1102,23 @@ int leblanc_apply(int argc, char **argv) {
 	printf("Set initial x\n");
 	double tic;
 	double *x = (double*) malloc(sizeof(double) * n);
+	double *g = (double *) malloc(sizeof(double*) * n);
+	double xtol = 0.01, fx, fy, dx, dy, df, tDijks;
 	tic = omp_get_wtime();
 	sprintf(filename, "../instances/%s_xsol.txt", argv[1]);
-	if(!xsol_read_csv(filename, x)) {
-		shortestpaths(&G, &M, dijkstra, x);	
+	if(xsol_read_csv(filename, x)) {
+		check_opt(&G, &M, dijkstra, x, &fx, g);		
+	}else{
+		shortestpaths(&G, &M, dijkstra, x);
 	}
 	printf("   Elapsed time: %3.2g secs\n", toc(tic));
 	
 	// initial fobj value
-	double *g = (double *) malloc(sizeof(double*) * n);
 	double f;
 	tic = omp_get_wtime();
 	bpr(&G, x, &f, g);
 	printf("fobj(x_start) = %.8E calculated in %3.2f seconds", f, toc(tic));
 	
-	double xtol = 0.01, fx, fy, dx, dy, df, tDijks;
 	int niter = 0, niter_linesearch;
 	char done = 0;
 	size_t maxit = 1000;
