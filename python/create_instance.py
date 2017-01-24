@@ -40,6 +40,9 @@ def create_instance(city):
     # print('lat[%d] : (%f,%f) ' % (nid, lon[nid], lat[nid]))
 
     print('Creating edges mapping')
+    print('   Converting from mph to kmh')
+    print('   Calculating distances from lat-lon coords')
+    print('   Calculating cost in hours')
     eid = edges.eid.as_matrix()
     source = edges.source.as_matrix()
     target = edges.target.as_matrix()
